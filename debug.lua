@@ -1,0 +1,2 @@
+CPP_FLAGS += '-O0'
+DEFINES += 'DEBUG_BUILD'

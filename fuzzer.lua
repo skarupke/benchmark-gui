@@ -1,0 +1,7 @@
+CPP_FLAGS += '-fsanitize=fuzzer,address'
+CPP_FLAGS += '-fsanitize-coverage=trace-pc-guard'
+CPP_FLAGS += '-fsanitize-coverage=trace-cmp'
+LINK_FLAGS += '-fsanitize=address'
+LINK_FLAGS += '-lFuzzer'
+DEFINES += 'ADDRESS_SANITIZER_BUILD'
+DEFINES += 'FUZZER_BUILD'

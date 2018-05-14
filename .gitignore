@@ -1,0 +1,16 @@
+.idea
+.tup
+build-gcc
+build-gcc-coverage
+build-gcc-debug
+build-clang-debug
+build-clang
+build-address-sanitizer-debug
+build-fuzzer-debug
+*.creator.user*
+callgrind.out.*
+benchmark_timings.db
+benchmark_timings_debug.db
+perf.data*
+fuzzer_corpus
+
