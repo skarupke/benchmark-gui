@@ -77,8 +77,7 @@ namespace test
         friend class equal_to;
         friend class less;
         int tag1_, tag2_;
-        
-        BOOST_COPYABLE_AND_MOVABLE(movable)
+
     public:
         explicit movable(int t1 = 0, int t2 = 0) : tag1_(t1), tag2_(t2) {}
         
@@ -88,7 +87,7 @@ namespace test
             BOOST_TEST(x.tag1_ != -1);
         }
         
-        movable(BOOST_RV_REF(movable) x) :
+        movable(movable&& x) :
             counted_object(x), tag1_(x.tag1_), tag2_(x.tag2_)
         {
             BOOST_TEST(x.tag1_ != -1);
@@ -96,7 +95,7 @@ namespace test
             x.tag2_ = -1;
         }
 
-        movable& operator=(BOOST_COPY_ASSIGN_REF(movable) x) // Copy assignment
+        movable& operator=(const movable& x) // Copy assignment
         {
             BOOST_TEST(x.tag1_ != -1);
             tag1_ = x.tag1_;
@@ -104,7 +103,7 @@ namespace test
             return *this;
         }
 
-        movable& operator=(BOOST_RV_REF(movable) x) //Move assignment
+        movable& operator=(movable&& x) //Move assignment
         {
             BOOST_TEST(x.tag1_ != -1);
             tag1_ = x.tag1_;
@@ -605,9 +604,9 @@ namespace test
         }
 
 #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
-        template<class... Args> void construct(T* p, BOOST_FWD_REF(Args)... args) {
+        template<class... Args> void construct(T* p, Args&&... args) {
 			detail::tracker().track_construct((void*) p, sizeof(T), tag_);
-            new(p) T(boost::forward<Args>(args)...);
+            new(p) T(std::forward<Args>(args)...);
         }
 #endif
 

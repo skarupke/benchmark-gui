@@ -62,7 +62,7 @@ UNORDERED_AUTO_TEST(fat_at_tests) {
 		x.at("three");
 		BOOST_ERROR("Should have thrown.");
 	}
-	catch(std::out_of_range) {
+    catch(const std::out_of_range&) {
 	}
 
 	BOOST_LIGHTWEIGHT_TEST_OSTREAM << "Finished" << std::endl;

@@ -3,10 +3,10 @@
 
 void RegisterFlat16HashMap()
 {
-    CategoryBuilder categories_so_far;
-    CategoryBuilder prime = categories_so_far.AddCategory("bucket count", "prime number");
-    CategoryBuilder power_of_two = categories_so_far.AddCategory("bucket count", "power of two");
-    CategoryBuilder other_power_of_two = categories_so_far.AddCategory("bucket count", "other two");
+    skb::CategoryBuilder categories_so_far;
+    skb::CategoryBuilder prime = categories_so_far.AddCategory("bucket count", "prime number");
+    skb::CategoryBuilder power_of_two = categories_so_far.AddCategory("bucket count", "power of two");
+    skb::CategoryBuilder other_power_of_two = categories_so_far.AddCategory("bucket count", "other two");
     using Allocator = counting_allocator<std::pair<KeyPlaceHolder, ValuePlaceHolder>>;
     RegisterLookups<ska::flat16_hash_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, Allocator>>()("flat16_hash_map", prime);
     RegisterLookups<ska::flat16_hash_map<KeyPlaceHolder, ValuePlaceHolder, power_of_two_hash, std::equal_to<>, Allocator>>()("flat16_hash_map", power_of_two);

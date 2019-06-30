@@ -206,6 +206,17 @@ private:
     std::map<std::string, std::string> categories;
 };
 
+struct CategoryBuilder
+{
+    CategoryBuilder AddCategory(std::string category, std::string value) const &;
+    CategoryBuilder AddCategory(std::string category, std::string value) &&;
+
+    skb::BenchmarkCategories BuildCategories(std::string type, std::string name) const &;
+    skb::BenchmarkCategories BuildCategories(std::string type, std::string name) &&;
+
+    std::map<std::string, std::string> categories;
+};
+
 struct Benchmark
 {
     virtual void Run(State & state) const = 0;
@@ -260,6 +271,6 @@ struct LambdaBenchmark : Benchmark
 #define SKB_CONCAT2(a, b) a ## b
 #define SKB_CONCAT(a, b) SKB_CONCAT2(a, b)
 
-#define SKA_BENCHMARK_CATEGORIES(function, categories) (new ::skb::LambdaBenchmark(function, categories))
+#define SKA_BENCHMARK_CATEGORIES(...) (new ::skb::LambdaBenchmark(__VA_ARGS__))
 #define SKA_BENCHMARK_NAME(function, category, name) (new ::skb::LambdaBenchmark(function, { category, name }))
 #define SKA_BENCHMARK(category, function_name) static ::skb::Benchmark * SKB_CONCAT(register_benchmark_, __LINE__) = SKA_BENCHMARK_NAME(&function_name, category, #function_name)

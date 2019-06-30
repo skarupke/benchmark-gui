@@ -3,7 +3,6 @@
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <boost/unordered/detail/allocate.hpp>
 #include <boost/detail/lightweight_test.hpp>
 #include <boost/type_traits/is_same.hpp>
 #include <boost/static_assert.hpp>
@@ -69,7 +68,7 @@ void reset() {
 template <typename Allocator>
 int call_select()
 {
-    typedef boost::unordered::detail::allocator_traits<Allocator> traits;
+    typedef std::allocator_traits<Allocator> traits;
     Allocator a;
 
     reset();
@@ -89,7 +88,7 @@ struct empty_allocator
 void test_empty_allocator()
 {
     typedef empty_allocator<int> allocator;
-    typedef boost::unordered::detail::allocator_traits<allocator> traits;
+    typedef std::allocator_traits<allocator> traits;
 #if BOOST_UNORDERED_USE_ALLOCATOR_TRAITS == 1
     BOOST_STATIC_ASSERT((boost::is_same<traits::size_type,
         std::make_unsigned<std::ptrdiff_t>::type>::value));
@@ -127,7 +126,7 @@ struct allocator1
 void test_allocator1()
 {
     typedef allocator1<int> allocator;
-    typedef boost::unordered::detail::allocator_traits<allocator> traits;
+    typedef std::allocator_traits<allocator> traits;
 #if BOOST_UNORDERED_USE_ALLOCATOR_TRAITS == 1
     BOOST_STATIC_ASSERT((boost::is_same<traits::size_type,
         std::make_unsigned<std::ptrdiff_t>::type>::value));
@@ -173,7 +172,7 @@ struct allocator2 : allocator2_base<allocator2<T> >
 void test_allocator2()
 {
     typedef allocator2<int> allocator;
-    typedef boost::unordered::detail::allocator_traits<allocator> traits;
+    typedef std::allocator_traits<allocator> traits;
     BOOST_STATIC_ASSERT((boost::is_same<traits::size_type, std::size_t>::value));
     BOOST_STATIC_ASSERT((boost::is_same<traits::difference_type, std::ptrdiff_t>::value));
     BOOST_STATIC_ASSERT((boost::is_same<traits::pointer, int*>::value));
@@ -237,7 +236,7 @@ struct allocator3
 void test_allocator3()
 {
     typedef allocator3<int> allocator;
-    typedef boost::unordered::detail::allocator_traits<allocator> traits;
+    typedef std::allocator_traits<allocator> traits;
     BOOST_STATIC_ASSERT((boost::is_same<traits::size_type, unsigned short>::value));
     BOOST_STATIC_ASSERT((boost::is_same<traits::difference_type, std::ptrdiff_t>::value));
     BOOST_STATIC_ASSERT((boost::is_same<traits::pointer, ptr<int> >::value));

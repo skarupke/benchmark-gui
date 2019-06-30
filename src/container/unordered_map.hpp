@@ -45,7 +45,7 @@ struct sherwood_v10_entry
 
     static EntryPointer * empty_pointer()
     {
-        static EntryPointer result[3] = { EntryPointer(nullptr) + ptrdiff_t(1), nullptr, nullptr };
+        static EntryPointer result[3] = { EntryPointer(reinterpret_cast<sherwood_v10_entry *>(size_t(1))), nullptr, nullptr };
         return result + 1;
     }
 };
@@ -615,7 +615,7 @@ public:
             return;
         EntryPointer * new_buckets(&*BucketAllocatorTraits::allocate(*this, num_buckets + 1));
         EntryPointer * end_it = new_buckets + static_cast<ptrdiff_t>(num_buckets + 1);
-        *new_buckets = EntryPointer(nullptr) + ptrdiff_t(1);
+        *new_buckets = EntryPointer(reinterpret_cast<Entry *>(size_t(1)));
         ++new_buckets;
         std::fill(new_buckets, end_it, nullptr);
         std::swap(entries, new_buckets);

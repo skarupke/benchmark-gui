@@ -3,7 +3,6 @@
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <boost/unordered/detail/allocate.hpp>
 #include <boost/detail/lightweight_test.hpp>
 #include <boost/type_traits/is_same.hpp>
 #include <boost/static_assert.hpp>
@@ -38,7 +37,7 @@ void test_simple_allocator()
 {
     test::check_instances check_;
 
-    typedef boost::unordered::detail::allocator_traits<
+    typedef std::allocator_traits<
         SimpleAllocator<T> > traits;
 
     BOOST_STATIC_ASSERT((boost::is_same<typename traits::allocator_type, SimpleAllocator<T> >::value));

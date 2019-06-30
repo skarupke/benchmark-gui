@@ -96,7 +96,7 @@ private:
     
     // TODO Not optimal as we have to use std::pair<const Key, T> as ValueType which forbid 
     // us to move the key in the bucket array, we have to use copy. Optimize.
-    using overflow_container_type = std::map<Key, T, Compare, Allocator>;
+    using overflow_container_type = std::map<Key, T, Compare, typename std::allocator_traits<Allocator>::template rebind_alloc<std::pair<const Key, T>>>;
     using ht = detail_hopscotch_hash::hopscotch_hash<std::pair<const Key, T>, KeySelect, ValueSelect,
                                                      Hash, KeyEqual, 
                                                      Allocator, NeighborhoodSize, 

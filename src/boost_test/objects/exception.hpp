@@ -359,10 +359,10 @@ namespace exception
         }
 
 #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
-        template<class... Args> void construct(T* p, BOOST_FWD_REF(Args)... args) {
-            UNORDERED_SCOPE(allocator::construct(pointer, BOOST_FWD_REF(Args)...)) {
+        template<class... Args> void construct(T* p, Args&&... args) {
+            UNORDERED_SCOPE(allocator::construct(pointer, Args&&...)) {
                 //UNORDERED_EPOINT("Mock allocator construct function.");
-                new(p) T(boost::forward<Args>(args)...);
+                new(p) T(std::forward<Args>(args)...);
             }
 			test::detail::tracker().track_construct((void*) p, sizeof(T), tag_);
         }
@@ -539,16 +539,16 @@ namespace exception
         }
 
 #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
-        template<class... Args> void construct(T* p, BOOST_FWD_REF(Args)... args) {
-            UNORDERED_SCOPE(allocator2::construct(pointer, BOOST_FWD_REF(Args)...)) {
+        template<class... Args> void construct(T* p, Args&&... args) {
+            UNORDERED_SCOPE(allocator2::construct(pointer, Args&&...)) {
                 UNORDERED_EPOINT("Mock allocator2 construct function.");
-                new(p) T(boost::forward<Args>(args)...);
+                new(p) T(std::forward<Args>(args)...);
             }
 			test::detail::tracker().track_construct((void*) p, sizeof(T), tag_);
         }
 #endif
 		void construct(T* p, T && to_move) {
-			new(p) T(boost::move(to_move));
+            new(p) T(std::move(to_move));
 			test::detail::tracker().track_construct((void*) p, sizeof(T), tag_);
 		}
 

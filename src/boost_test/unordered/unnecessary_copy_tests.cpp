@@ -55,14 +55,14 @@ namespace unnecessary_copy_tests
             trace_op("Copy construct");
         }
 
-        count_copies(BOOST_RV_REF(count_copies) x) :
+        count_copies(count_copies&& x) :
             tag_(x.tag_), id_(++id_count)
         {
             x.tag_ = -1; ++moves;
             trace_op("Move construct");
         }
 
-        count_copies& operator=(BOOST_COPY_ASSIGN_REF(count_copies) p) // Copy assignment
+        count_copies& operator=(const count_copies& p) // Copy assignment
         {
             tag_ = p.tag_;
             ++copies;
@@ -70,7 +70,7 @@ namespace unnecessary_copy_tests
             return *this;
         }
 
-        count_copies& operator=(BOOST_RV_REF(count_copies) p) //Move assignment
+        count_copies& operator=(count_copies&& p) //Move assignment
         {
             tag_ = p.tag_;
             ++moves;
@@ -226,7 +226,7 @@ namespace unnecessary_copy_tests
         T x;
         BOOST_DEDUCED_TYPENAME T::value_type a;
         COPY_COUNT(1); MOVE_COUNT(0);
-        x.emplace(boost::move(a));
+        x.emplace(std::move(a));
 #if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES)
         COPY_COUNT(1); MOVE_COUNT(1);
 #else
@@ -245,7 +245,7 @@ namespace unnecessary_copy_tests
         T x;
         BOOST_DEDUCED_TYPENAME T::value_type a;
         COPY_COUNT(1); MOVE_COUNT(0);
-        x.emplace(boost::move(a));
+        x.emplace(std::move(a));
         COPY_COUNT(1); MOVE_COUNT(1);
     }
 
@@ -260,7 +260,7 @@ namespace unnecessary_copy_tests
         COPY_COUNT(0); MOVE_COUNT(0);
         BOOST_DEDUCED_TYPENAME T::value_type a;
         COPY_COUNT(1); MOVE_COUNT(0);
-        x.emplace(boost::move(a));
+        x.emplace(std::move(a));
 #if defined(BOOST_NO_CXX11_RVALUE_REFERENCES)
         COPY_COUNT(2); MOVE_COUNT(0);
 #else
@@ -324,7 +324,7 @@ namespace unnecessary_copy_tests
 
         // No move should take place.
         reset();
-        x.emplace(boost::move(a));
+        x.emplace(std::move(a));
 #if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES)
         COPY_COUNT(0); MOVE_COUNT(0);
 #else
@@ -392,7 +392,7 @@ namespace unnecessary_copy_tests
 #   if BOOST_WORKAROUND(BOOST_MSVC, == 1700)
 		// This is a little odd, Visual C++ 11 seems to move the pair, which
 		// results in one copy (for the const key) and one move (for the
-		// non-const mapped value). Since 'emplace(boost::move(a))' (see below)
+        // non-const mapped value). Since 'emplace(std::move(a))' (see below)
 		// has the normal result, it must be some odd consequence of how
 		// Visual C++ 11 handles calling move for default arguments.
 		COPY_COUNT(3); MOVE_COUNT(1);
@@ -444,7 +444,7 @@ namespace unnecessary_copy_tests
 		// No move should take place.
 		// (since a is already in the container)
 		reset();
-		x.emplace(boost::move(a));
+        x.emplace(std::move(a));
 		COPY_COUNT(0); MOVE_COUNT(0);
 
 		//

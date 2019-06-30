@@ -3,7 +3,7 @@
 
 void RegisterLLVMUnorderedMap()
 {
-    CategoryBuilder categories;
+    skb::CategoryBuilder categories;
     categories = categories.AddCategory("unordered_map variant", "libc++ (llvm)");
     using Allocator = counting_allocator<std::pair<KeyPlaceHolder, ValuePlaceHolder>>;
     RegisterLookups<llvm_std::unordered_map<KeyPlaceHolder, ValuePlaceHolder, std::hash<KeyPlaceHolder>, std::equal_to<>, Allocator>>()("unordered_map", categories);

@@ -435,7 +435,7 @@ void move_emplace_tests(X*, test::random_generator generator)
         //float b = x.max_load_factor();
 
         typename X::value_type value = *it;
-        x.emplace(boost::move(value));
+        x.emplace(std::move(value));
         tracker.insert(*it);
         tracker.compare_key(x, *it);
 

@@ -188,8 +188,8 @@ namespace minimal
         movable1(constructor_param const&) {}
         movable1() {}
         explicit movable1(movable_init) {}
-        movable1(BOOST_RV_REF(movable1)) {}
-        movable1& operator=(BOOST_RV_REF(movable1)) { return *this; }
+        movable1(movable1&&) {}
+        movable1& operator=(movable1&&) { return *this; }
         ~movable1() {}
     };
 
@@ -432,8 +432,8 @@ namespace minimal
         void construct(T* p, T const& t) { new((void*)p) T(t); }
 
 #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
-        template<class... Args> void construct(T* p, BOOST_FWD_REF(Args)... args) {
-            new((void*)p) T(boost::forward<Args>(args)...);
+        template<class... Args> void construct(T* p, Args&&... args) {
+            new((void*)p) T(std::forward<Args>(args)...);
         }
 #endif
 
@@ -504,8 +504,8 @@ namespace minimal
         void construct(T* p, T const& t) { new((void*)p) T(t); }
 
 #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
-        template<class... Args> void construct(T* p, BOOST_FWD_REF(Args)... args) {
-            new((void*)p) T(boost::forward<Args>(args)...);
+        template<class... Args> void construct(T* p, Args&&... args) {
+            new((void*)p) T(std::forward<Args>(args)...);
         }
 #endif
 

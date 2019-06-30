@@ -77,7 +77,7 @@ struct swap_base : public test::exception_base
     void run(data_type& d) const {
         try {
             d.x.swap(d.y);
-        } catch (std::runtime_error) {}
+        } catch (const std::runtime_error&) {}
     }
     void check BOOST_PREVENT_MACRO_SUBSTITUTION(data_type const& d) const {
 		std::string scope(test::scope());

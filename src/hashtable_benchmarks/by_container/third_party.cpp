@@ -145,16 +145,17 @@ struct HasMutableMapped<multi_index<K, V, A>>
 
 void RegisterThirdPartyHashtables()
 {
-    CategoryBuilder categories_so_far;
+    skb::CategoryBuilder categories_so_far;
     using Allocator = counting_allocator<std::pair<KeyPlaceHolder, ValuePlaceHolder>>;
-    RegisterLookups<std::map<KeyPlaceHolder, ValuePlaceHolder, std::less<>, Allocator>>()("map", categories_so_far);
+    using ConstKeyAllocator = counting_allocator<std::pair<const KeyPlaceHolder, ValuePlaceHolder>>;
+    RegisterLookups<std::map<KeyPlaceHolder, ValuePlaceHolder, std::less<>, ConstKeyAllocator>>()("map", categories_so_far);
     RegisterLookups<boost::container::flat_map<KeyPlaceHolder, ValuePlaceHolder, std::less<>, Allocator>>()("boost::flat_map", categories_so_far);
     RegisterLookups<multi_index<KeyPlaceHolder, ValuePlaceHolder, Allocator>>()("boost::multi_index", categories_so_far);
     RegisterLookups<google::dense_hash_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, Allocator>>()("dense_hash_map", categories_so_far);
     RegisterLookups<__gnu_cxx::hash_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, Allocator>>()("gnu_cxx::hash_map", categories_so_far);
-    CategoryBuilder std_unordered_map = categories_so_far.AddCategory("unordered_map variant", "std::unordered_map");
-    CategoryBuilder boost_unordered_map = categories_so_far.AddCategory("unordered_map variant", "boost::unordered_map");
-    RegisterLookups<std::unordered_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, Allocator>>()("unordered_map", std_unordered_map);
+    skb::CategoryBuilder std_unordered_map = categories_so_far.AddCategory("unordered_map variant", "std::unordered_map");
+    skb::CategoryBuilder boost_unordered_map = categories_so_far.AddCategory("unordered_map variant", "boost::unordered_map");
+    RegisterLookups<std::unordered_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, ConstKeyAllocator>>()("unordered_map", std_unordered_map);
     RegisterLookups<boost::unordered_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, Allocator>>()("unordered_map", boost_unordered_map);
 }
 

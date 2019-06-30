@@ -662,8 +662,8 @@ private:
     static_assert(std::is_same<typename overflow_container_type::value_type, ValueType>::value, 
                   "OverflowContainer should have ValueType as type.");
     
-    static_assert(std::is_same<typename overflow_container_type::allocator_type, Allocator>::value, 
-                  "Invalid allocator, not the same type as the value_type.");
+    //static_assert(std::is_same<typename overflow_container_type::allocator_type, Allocator>::value,
+    //              "Invalid allocator, not the same type as the value_type.");
     
     
     using iterator_buckets = typename buckets_container_type::iterator; 

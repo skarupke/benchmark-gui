@@ -3,8 +3,10 @@
 //    (See http://www.boost.org/LICENSE_1_0.txt)
 
 #include "util/radix_sort.hpp"
+#include <deque>
+#include <optional>
 
-//#define FULL_TESTS_SLOW_COMPILE_TIME
+#define FULL_TESTS_SLOW_COMPILE_TIME
 
 template<typename It, typename OutIt, typename ExtractKey>
 void counting_sort(It begin, It end, OutIt out_begin, ExtractKey && extract_key)
@@ -29,10 +31,50 @@ bool radix_sort(It begin, It end, OutIt buffer_begin)
     return detail::RadixSorter<decltype(*begin)>::sort(begin, end, buffer_begin, detail::IdentityFunctor());
 }
 
+struct NoStdSortFallbackSetting : detail::DefaultSortSettings
+{
+    template<typename>
+    static constexpr std::ptrdiff_t InsertionSortUpperLimit = 1;
+    static constexpr std::ptrdiff_t AmericanFlagSortUpperLimit = 1;
+};
+
+template<bool DoThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap>
+struct AmericanFlagSortOnlySetting : detail::DefaultSortSettings
+{
+    static constexpr std::ptrdiff_t AmericanFlagSortUpperLimit = std::numeric_limits<std::ptrdiff_t>::max();
+    static constexpr bool ThreeWaySwap = DoThreeWaySwap;
+};
+
+template<bool DoThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap>
+struct AmericanFlagSortOnlySettingTest : NoStdSortFallbackSetting
+{
+    static constexpr std::ptrdiff_t AmericanFlagSortUpperLimit = std::numeric_limits<std::ptrdiff_t>::max();
+    static constexpr bool ThreeWaySwap = DoThreeWaySwap;
+};
+
+template<std::ptrdiff_t InsertionSortSize,
+         std::ptrdiff_t AmericanFlagSortSize = detail::DefaultSortSettings::AmericanFlagSortUpperLimit,
+         bool DoThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap
+         , size_t FirstLoopUnrollAmountParam = detail::DefaultSortSettings::FirstLoopUnrollAmount
+         , size_t SecondLoopUnrollAmountParam = detail::DefaultSortSettings::SecondLoopUnrollAmount
+         , bool UseIndexSortInsteadOfInsertionSort = detail::DefaultSortSettings::UseIndexSort
+         , bool UseFasterComparison = detail::DefaultSortSettings::UseFasterCompare>
+struct ConfigurableSettings : detail::DefaultSortSettings
+{
+    template<typename>
+    static constexpr std::ptrdiff_t InsertionSortUpperLimit = InsertionSortSize;
+    static constexpr bool ThreeWaySwap = DoThreeWaySwap;
+    static constexpr std::ptrdiff_t AmericanFlagSortUpperLimit = AmericanFlagSortSize;
+    static constexpr size_t FirstLoopUnrollAmount = FirstLoopUnrollAmountParam;
+    static constexpr size_t SecondLoopUnrollAmount = SecondLoopUnrollAmountParam;
+    static constexpr bool UseIndexSort = UseIndexSortInsteadOfInsertionSort;
+    static constexpr bool UseFasterCompare = UseFasterComparison;
+};
+
 template<typename It, typename ExtractKey>
 static void inplace_radix_sort(It begin, It end, ExtractKey && extract_key)
 {
-    detail::inplace_radix_sort<1, 1>(begin, end, extract_key);
+    detail::inplace_radix_sort<NoStdSortFallbackSetting>(begin, end, extract_key);
 }
 
 template<typename It>
@@ -44,7 +86,12 @@ static void inplace_radix_sort(It begin, It end)
 template<typename It, typename ExtractKey>
 static void american_flag_sort(It begin, It end, ExtractKey && extract_key)
 {
-    detail::inplace_radix_sort<128, std::numeric_limits<std::ptrdiff_t>::max()>(begin, end, extract_key);
+    detail::inplace_radix_sort<AmericanFlagSortOnlySetting<detail::DefaultSortSettings::ThreeWaySwap>>(begin, end, extract_key);
+}
+template<bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap, typename It, typename ExtractKey>
+static void american_flag_sort_test(It begin, It end, ExtractKey && extract_key)
+{
+    detail::inplace_radix_sort<AmericanFlagSortOnlySettingTest<ThreeWaySwap>>(begin, end, extract_key);
 }
 
 template<typename It>
@@ -53,10 +100,327 @@ static void american_flag_sort(It begin, It end)
     american_flag_sort(begin, end, detail::IdentityFunctor());
 }
 
+template<typename SortSettings, typename It, typename ExtractKey>
+static bool counting_sort_ping_pong(It begin, It end, It buffer_begin, ExtractKey && extract_key)
+{
+    return detail::ping_pong_ska_sort<SortSettings>(begin, end, buffer_begin, extract_key);
+}
+template<typename SortSettings, typename It>
+static bool counting_sort_ping_pong(It begin, It end, It buffer_begin)
+{
+    return counting_sort_ping_pong<SortSettings>(begin, end, buffer_begin, detail::IdentityFunctor());
+}
+
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, typename It, typename ExtractKey>
+static bool counting_sort_ping_pong_configurable(It begin, It end, It buffer_begin, ExtractKey && extract_key)
+{
+    return counting_sort_ping_pong<ConfigurableSettings<InsertionSortUpperLimit>>(begin, end, buffer_begin, extract_key);
+}
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, typename It>
+static bool counting_sort_ping_pong_configurable(It begin, It end, It buffer_begin)
+{
+    return counting_sort_ping_pong_configurable<InsertionSortUpperLimit>(begin, end, buffer_begin, detail::IdentityFunctor());
+}
+
+template<typename It, typename ExtractKey>
+static bool counting_sort_ping_pong_test(It begin, It end, It buffer_begin, ExtractKey && extract_key)
+{
+    return detail::ping_pong_ska_sort<NoStdSortFallbackSetting>(begin, end, buffer_begin, extract_key);
+}
+
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, std::ptrdiff_t AmericanFlagSortUpperLimit = detail::DefaultSortSettings::AmericanFlagSortUpperLimit, typename It, typename ExtractKey>
+void ska_sort_configurable(It begin, It end, ExtractKey && extract_key)
+{
+    detail::inplace_radix_sort<ConfigurableSettings<InsertionSortUpperLimit, AmericanFlagSortUpperLimit>>(begin, end, extract_key);
+}
+
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, std::ptrdiff_t AmericanFlagSortUpperLimit = detail::DefaultSortSettings::AmericanFlagSortUpperLimit, typename It>
+void ska_sort_configurable(It begin, It end)
+{
+    ska_sort_configurable<InsertionSortUpperLimit, AmericanFlagSortUpperLimit>(begin, end, detail::IdentityFunctor());
+}
+
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap, typename It, typename ExtractKey>
+void ska_byte_sort_configurable(It begin, It end, ExtractKey && extract_key)
+{
+    detail::inplace_radix_sort<ConfigurableSettings<InsertionSortUpperLimit, 1, ThreeWaySwap>>(begin, end, extract_key);
+}
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap, typename It>
+void ska_byte_sort_configurable(It begin, It end)
+{
+    ska_byte_sort_configurable<InsertionSortUpperLimit, ThreeWaySwap>(begin, end, detail::IdentityFunctor());
+}
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap, typename It, typename ExtractKey>
+void american_flag_sort_configurable(It begin, It end, ExtractKey && extract_key)
+{
+    detail::inplace_radix_sort<ConfigurableSettings<InsertionSortUpperLimit, std::numeric_limits<std::ptrdiff_t>::max(), ThreeWaySwap>>(begin, end, extract_key);
+}
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap, typename It>
+void american_flag_sort_configurable(It begin, It end)
+{
+    american_flag_sort_configurable<InsertionSortUpperLimit, ThreeWaySwap>(begin, end, detail::IdentityFunctor());
+}
+
 #ifndef DISABLE_GTEST
 
 #include <vector>
 #include <gtest/gtest.h>
+#include <random>
+
+template<typename ExtractKey>
+struct CompareWithExtractKey
+{
+    ExtractKey & extract_key;
+
+    template<typename T>
+    bool operator()(const T & l, const T & r) const
+    {
+        return extract_key(l) < extract_key(r);
+    }
+    template<typename T>
+    bool operator()(T & l, T & r) const
+    {
+        return extract_key(l) < extract_key(r);
+    }
+};
+template<typename T, typename Shuffle, typename ExtractKey>
+::testing::AssertionResult TestAllSorts(T & container, Shuffle && shuffle, ExtractKey && extract_key)
+{
+    T copy;
+    copy.resize(container.size());
+
+    auto is_sorted = [&](auto && to_check)
+    {
+        return std::is_sorted(to_check.begin(), to_check.end(), CompareWithExtractKey<std::remove_reference_t<ExtractKey>>{extract_key});
+    };
+
+    shuffle(container);
+    if (radix_sort(container.begin(), container.end(), copy.begin(), extract_key))
+    {
+        if (!is_sorted(copy))
+            return ::testing::AssertionFailure() << "radix sort failed";
+        copy.swap(container);
+    }
+    else if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "radix sort failed";
+
+    shuffle(container);
+    if (ska_sort_ping_pong(container.begin(), container.end(), copy.begin(), extract_key))
+    {
+        if (!is_sorted(copy))
+            return ::testing::AssertionFailure() << "ska_sort_ping_pong failed";
+        copy.swap(container);
+    }
+    else if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "ska_sort_ping_pong failed";
+
+    std::deque<typename T::value_type> copy_of_different_type;
+    copy_of_different_type.resize(container.size());
+    shuffle(container);
+    if (ska_sort_ping_pong(container.begin(), container.end(), copy_of_different_type.begin(), extract_key))
+    {
+        if (!is_sorted(copy_of_different_type))
+            return ::testing::AssertionFailure() << "radix sort failed";
+        container.clear();
+        for (auto & elem : copy_of_different_type)
+            container.push_back(std::move(elem));
+    }
+    else if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "radix sort failed";
+
+    shuffle(container);
+    if (counting_sort_ping_pong_test(container.begin(), container.end(), copy.begin(), extract_key))
+    {
+        if (!is_sorted(copy))
+            return ::testing::AssertionFailure() << "counting_sort_ping_pong failed";
+        copy.swap(container);
+    }
+    else if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "counting_sort_ping_pong failed";
+
+    shuffle(container);
+    if (counting_sort_ping_pong_configurable<1>(container.begin(), container.end(), copy.begin(), extract_key))
+    {
+        if (!is_sorted(copy))
+            return ::testing::AssertionFailure() << "counting_sort_ping_pong_configurable failed";
+        copy.swap(container);
+    }
+    else if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "counting_sort_ping_pong_configurable failed";
+
+    shuffle(container);
+    inplace_radix_sort(container.begin(), container.end(), extract_key);
+    if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "inplace_radix_sort failed";
+
+    shuffle(container);
+    american_flag_sort_test(container.begin(), container.end(), extract_key);
+    if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "american_flag_sort failed";
+
+    shuffle(container);
+    ska_byte_sort_configurable<1>(container.begin(), container.end(), extract_key);
+    if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "ska_byte_sort failed";
+
+    shuffle(container);
+    ska_byte_sort_configurable<1, true>(container.begin(), container.end(), extract_key);
+    if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "ska_byte_sort with three way swap failed";
+
+    shuffle(container);
+    ska_sort(container.begin(), container.end(), extract_key);
+    if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "ska_sort failed";
+
+    shuffle(container);
+    ska_sort_configurable<1>(container.begin(), container.end(), extract_key);
+    if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "ska_sort_configurable failed";
+
+    shuffle(container);
+    detail::insertion_sort(container.begin(), container.end(), [&](auto && l, auto && r)
+    {
+        return extract_key(l) < extract_key(r);
+    });
+    if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "insertion_sort failed";
+
+    return ::testing::AssertionSuccess();
+}
+
+template<typename T>
+void EnsurePermutation(T & container, std::vector<size_t> permutation)
+{
+    using std::swap;
+    for (size_t i = 0, end = container.size(); i < end;)
+    {
+        size_t desired_position = permutation[i];
+        if (desired_position == i)
+            ++i;
+        else
+        {
+            swap(container[i], container[desired_position]);
+            swap(permutation[i], permutation[desired_position]);
+        }
+    }
+}
+
+template<typename T, typename ExtractKey>
+::testing::AssertionResult TestAllSorts(T & container, ExtractKey && extract_key)
+{
+    std::vector<std::pair<typename T::value_type, size_t>> get_sorted_permutation;
+    get_sorted_permutation.reserve(container.size());
+    for (size_t i = 0, end = container.size(); i < end; ++i)
+    {
+        get_sorted_permutation.emplace_back(std::move(container[i]), i);
+    }
+    container.clear();
+    std::sort(get_sorted_permutation.begin(), get_sorted_permutation.end(), [&](auto && l, auto && r)
+    {
+        return extract_key(l.first) < extract_key(r.first);
+    });
+    std::vector<size_t> permutation;
+    permutation.reserve(container.size());
+    for (auto & pair : get_sorted_permutation)
+    {
+        container.push_back(std::move(pair.first));
+        permutation.push_back(pair.second);
+    }
+    return TestAllSorts(container, [&](T & to_shuffle)
+    {
+        EnsurePermutation(to_shuffle, permutation);
+    }, extract_key);
+}
+template<typename T>
+::testing::AssertionResult TestAllSorts(T & container)
+{
+    return TestAllSorts(container, detail::IdentityFunctor());
+}
+
+
+template<typename T, typename ExtractKey>
+::testing::AssertionResult TestVariableSizeSorts(T & container, ExtractKey && extract_key)
+{
+    T copy;
+    copy.resize(container.size());
+
+    auto is_sorted = [&](T & to_check)
+    {
+        return std::is_sorted(to_check.begin(), to_check.end(), CompareWithExtractKey<std::remove_reference_t<ExtractKey>>{extract_key});
+    };
+
+    detail::IdentityFunctor identity;
+    OverloadedCallWrapper<ExtractKey, detail::IdentityFunctor> wrapper{{extract_key, identity}};
+    std::mt19937_64 randomness(5);
+    inplace_radix_sort(container.begin(), container.end(), wrapper);
+    if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "inplace_radix_sort failed";
+
+    std::shuffle(container.begin(), container.end(), randomness);
+    american_flag_sort(container.begin(), container.end(), wrapper);
+    if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "american_flag_sort failed";
+
+    std::shuffle(container.begin(), container.end(), randomness);
+    ska_sort(container.begin(), container.end(), extract_key);
+    if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "ska_sort failed";
+
+    return ::testing::AssertionSuccess();
+}
+template<typename T>
+::testing::AssertionResult TestVariableSizeSorts(T & container)
+{
+    return TestVariableSizeSorts(container, detail::IdentityFunctor());
+}
+
+#ifdef FUZZER_BUILD
+extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t * data, std::size_t size)
+{
+    const int * as_int = reinterpret_cast<const int*>(data);
+    std::vector<int> to_sort(as_int, as_int + size / 4);
+    ::testing::AssertionResult result = TestAllSorts(to_sort);
+    if (!result)
+    {
+        std::cout << result.message() << std::endl;
+        __builtin_trap();
+    }
+    return 0;
+}
+#endif
+
+TEST(unroll_loop, cases)
+{
+    std::vector<int> to_iterate(20);
+    std::iota(to_iterate.begin(), to_iterate.end(), 1);
+    int expected = std::accumulate(to_iterate.begin(), to_iterate.end(), 0);
+    int loop_count = 0;
+    auto loop_body = [&](auto to_add){ loop_count += *to_add; };
+    detail::unroll_loop_nonempty<1>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    detail::unroll_loop_nonempty<2>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    detail::unroll_loop_nonempty<3>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    detail::unroll_loop_nonempty<4>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    detail::unroll_loop_nonempty<5>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    detail::unroll_loop_nonempty<6>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    detail::unroll_loop_nonempty<7>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    detail::unroll_loop_nonempty<8>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+}
 
 TEST(counting_sort, simple)
 {
@@ -76,239 +440,118 @@ TEST(counting_sort, string)
     ASSERT_EQ(to_sort, result);
 }
 
-TEST(radix_sort, uint8)
+TEST(sort, uint8)
 {
     std::vector<uint8_t> to_sort = { 5, 6, 19, 2, 5, 0, 7, 23, 6, 255, 8, 99 };
-    std::vector<uint8_t> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(to_sort, result);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, uint8_256_items)
+TEST(sort, uint8_256_items)
 {
-    std::vector<uint8_t> to_sort(256, 254);
-    to_sort.back() = 255;
-    std::vector<uint8_t> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(to_sort, result);
+    std::vector<uint8_t> to_sort(256, 255);
+    to_sort.back() = 254;
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, int8)
+TEST(sort, int8)
 {
     std::vector<int8_t> to_sort = { 5, 6, 19, -4, 2, 5, 0, -55, 7, 23, 6, 8, 127, -128, 99 };
-    std::vector<int8_t> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(to_sort, result);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, text)
+TEST(sort, text)
 {
     std::string to_sort = "Hello, World!";
-    std::string result(to_sort.size(), ' ');
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto c){ return c; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(to_sort, result);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, u16string)
+TEST(sort, u16string)
 {
     std::u16string to_sort = u"Hello, World!";
-    std::u16string result(to_sort.size(), ' ');
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto c){ return c; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(to_sort, result);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, u32string)
+TEST(sort, u32string)
 {
     std::u32string to_sort = U"Hello, World!";
-    std::u32string result(to_sort.size(), ' ');
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto c){ return c; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(to_sort, result);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, int16)
+TEST(sort, int16)
 {
     std::vector<int16_t> to_sort = { 5, 6, 19, -4, 2, 5, 0, -55, 7, 1000, 23, 6, 8, 127, -128, -129, -256, -32768, 32767, 99 };
-    std::vector<int16_t> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(to_sort, result);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, uint16)
+TEST(sort, uint16)
 {
     std::vector<uint16_t> to_sort = { 5, 6, 19, 2, 5, 7, 0, 23, 6, 256, 255, 8, 99, 1024, 65535, 65534 };
-    std::vector<uint16_t> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(to_sort, result);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, int32)
+TEST(sort, int32)
 {
     std::vector<int32_t> to_sort = { 5, 6, 19, -4, 2, 5, 0, -55, 7, 1000, 23, 6, 8, 127, -128, -129, -256, 32768, -32769, -32768, 32767, 99, 1000000, -1000001, std::numeric_limits<int>::lowest(), std::numeric_limits<int>::max(), std::numeric_limits<int>::max() - 1, std::numeric_limits<int>::lowest() + 1 };
-    std::vector<int32_t> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, uint32)
+TEST(sort, uint32)
 {
     std::vector<uint32_t> to_sort = { 5, 6, 19, 2, 5, 7, 0, 23, 6, 256, 255, 8, 99, 1024, 65536, 65535, 65534, 1000000, std::numeric_limits<unsigned int>::max() };
-    std::vector<uint32_t> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, int64)
+TEST(sort, int64)
 {
     std::vector<int64_t> to_sort = { 5, 6, 19, std::numeric_limits<std::int32_t>::lowest() + 1, std::numeric_limits<ino64_t>::lowest(), -1000000000000, 1000000000000, std::numeric_limits<int32_t>::max(), std::numeric_limits<int64_t>::max(), -4, 2, 5, 0, -55, 7, 1000, 23, 6, 8, 127, -128, -129, -256, 32768, -32769, -32768, 32767, 99, 1000000, -1000001, std::numeric_limits<int>::lowest(), std::numeric_limits<int>::max(), std::numeric_limits<int>::max() - 1, std::numeric_limits<int>::lowest() + 1 };
-    std::vector<int64_t> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, uint64)
+TEST(sort, uint64)
 {
     std::vector<uint64_t> to_sort = { 5, 6, 19, 2, 5, 7, 0, std::numeric_limits<uint32_t>::max() + 1, 1000000000000, std::numeric_limits<uint64_t>::max(), 23, 6, 256, 255, 8, 99, 1024, 65536, 65535, 65534, 1000000, std::numeric_limits<unsigned int>::max() };
-    std::vector<uint64_t> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, float)
+TEST(sort, float)
 {
     std::vector<float> to_sort = { 5, 6, 19, std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), -4, 2, 5, 0, -55, 7, 1000, 23, 6, 8, 127, -128, -129, -256, 32768, -32769, -32768, 32767, 99, 1000000, -1000001, 0.1f, 2.5f, 17.8f, -12.4f, -0.0000002f, -0.0f, -777777777.7f, 444444444444.4f };
-    std::vector<float> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, double)
+TEST(sort, double)
 {
     std::vector<double> to_sort = { 5, 6, 19, std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(), -4, 2, 5, 0, -55, 7, 1000, 23, 6, 8, 127, -128, -129, -256, 32768, -32769, -32768, 32767, 99, 1000000, -1000001, 0.1, 2.5, 17.8, -12.4, -0.0000002, -0.0, -777777777.7, 444444444444.4 };
-    std::vector<double> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, pair)
+TEST(sort, pair)
 {
     std::vector<std::pair<int, bool>> to_sort = { { 5, true }, { 5, false }, { 6, false }, { 7, true }, { 4, false }, { 4, true } };
-    std::vector<std::pair<int, bool>> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(to_sort, result);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, pair_other_direction)
+TEST(sort, pair_other_direction)
 {
     std::vector<std::pair<bool, int>> to_sort = { { true, 5 }, { false, 5 }, { false, 6 }, { true, 7 }, { false, 4 }, { true, 4 } };
-    std::vector<std::pair<bool, int>> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(to_sort, result);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, tuple)
+TEST(sort, tuple)
 {
     std::vector<std::tuple<bool, int, bool>> to_sort = { std::tuple<bool, int, bool>{ true, 5, true }, std::tuple<bool, int, bool>{ true, 5, false }, std::tuple<bool, int, bool>{ false, 6, false }, std::tuple<bool, int, bool>{ true, 7, true }, std::tuple<bool, int, bool>{ true, 4, false }, std::tuple<bool, int, bool>{ false, 4, true }, std::tuple<bool, int, bool>{ false, 5, false } };
-    std::vector<std::tuple<bool, int, bool>> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto i){ return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, reference)
+TEST(sort, tuple_single)
+{
+    std::vector<std::tuple<int>> to_sort = { std::tuple<int>{ 5 }, std::tuple<int>{ -5 }, std::tuple<int>{ 6 }, std::tuple<int>{ 7 }, std::tuple<int>{ 4 }, std::tuple<int>{ 4 }, std::tuple<int>{ 5 } };
+    ASSERT_TRUE(TestAllSorts(to_sort));
+}
+TEST(sort, reference)
 {
     std::vector<int> to_sort = { 6, 5, 4, 3, 2, 1 };
-    std::vector<int> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](int & i) -> int & { return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
+    ASSERT_TRUE(TestAllSorts(to_sort, [](int & i) -> int & { return i; }));
 }
-TEST(radix_sort, pair_reference)
+TEST(sort, pair_reference)
 {
     std::vector<std::pair<int, bool>> to_sort = { { 5, true }, { 5, false }, { 6, false }, { 7, true }, { 4, false }, { 4, true } };
-    std::vector<std::pair<int, bool>> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto & i) -> decltype(auto) { return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(to_sort, result);
+    ASSERT_TRUE(TestAllSorts(to_sort, [](auto & i) -> decltype(auto) { return i; }));
 }
-TEST(radix_sort, tuple_reference)
+TEST(sort, tuple_reference)
 {
     std::vector<std::tuple<bool, int, bool>> to_sort = { std::tuple<bool, int, bool>{ true, 5, true }, std::tuple<bool, int, bool>{ true, 5, false }, std::tuple<bool, int, bool>{ false, 6, false }, std::tuple<bool, int, bool>{ true, 7, true }, std::tuple<bool, int, bool>{ true, 4, false }, std::tuple<bool, int, bool>{ false, 4, true }, std::tuple<bool, int, bool>{ false, 5, false } };
-    std::vector<std::tuple<bool, int, bool>> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto & i) -> decltype(auto) { return i; });
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
+    ASSERT_TRUE(TestAllSorts(to_sort, [](auto & i) -> decltype(auto) { return i; }));
 }
-TEST(radix_sort, std_array)
+TEST(sort, std_array)
 {
     std::vector<std::array<float, 4>> to_sort = { {{ 1.0f, 2.0f, 3.0f, 4.0f }}, {{ 0.0f, 3.0f, 4.0f, 5.0f }}, {{ 1.0f, 1.5f, 2.0f, 2.5f }}, {{ 1.0f, 2.0f, 2.5f, 4.0f }}, {{ 1.0f, 2.0f, 2.5f, 3.5f }}, {{ 0.0f, 3.0f, 4.5f, 4.5f }} };
-    std::vector<std::array<float, 4>> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin());
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
-TEST(radix_sort, move_only)
+TEST(sort, move_only)
 {
     std::vector<std::unique_ptr<int>> to_sort;
     to_sort.push_back(std::make_unique<int>(5));
@@ -320,225 +563,93 @@ TEST(radix_sort, move_only)
     for (const std::unique_ptr<int> & i : to_sort)
         sorted.push_back(*i);
     std::sort(sorted.begin(), sorted.end());
-    std::vector<std::unique_ptr<int>> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin(), [](auto & i){ return *i; });
-    for (size_t i = 0; i < sorted.size(); ++i)
-    {
-        if (which_buffer)
-            ASSERT_EQ(sorted[i], *result[i]);
-        else
-            ASSERT_EQ(sorted[i], *to_sort[i]);
-    }
+    ASSERT_TRUE(TestAllSorts(to_sort, [](auto & i){ return *i; }));
 }
 
-TEST(radix_sort, vector_bool)
+TEST(sort, vector_bool)
 {
     std::vector<bool> to_sort = { true, false, true, true, false, true, true, true, false, true, false, false };
-    std::vector<bool> result(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), result.begin());
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
 
-TEST(linear_sort, tuple)
-{
-    std::vector<std::tuple<bool, int, bool>> to_sort = { std::tuple<bool, int, bool>{ true, 5, true }, std::tuple<bool, int, bool>{ true, 5, false }, std::tuple<bool, int, bool>{ false, 6, false }, std::tuple<bool, int, bool>{ true, 7, true }, std::tuple<bool, int, bool>{ true, 4, false }, std::tuple<bool, int, bool>{ false, 4, true }, std::tuple<bool, int, bool>{ false, 5, false } };
-    std::vector<std::tuple<bool, int, bool>> result = to_sort;
-    bool which_buffer = ska_sort_copy(to_sort.begin(), to_sort.end(), result.begin());
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
-}
 
-/*TEST(linear_sort, string)
-{
-    std::vector<std::string> to_sort = { "foo", "bar", "baz" };
-    std::vector<std::string> result = to_sort;
-    bool which_buffer = ska_sort_copy(to_sort.begin(), to_sort.end(), result.begin());
-    if (which_buffer)
-        std::sort(to_sort.begin(), to_sort.end());
-    else
-        std::sort(result.begin(), result.end());
-    ASSERT_EQ(result, to_sort);
-}*/
-
-TEST(inplace_radix_sort, uint8)
-{
-    std::vector<uint8_t> to_sort = { 5, 6, 19, 2, 5, 0, 7, 23, 6, 255, 8, 99 };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, int8)
-{
-    std::vector<int8_t> to_sort = { 5, 6, 19, -4, 2, 5, 0, -55, 7, 23, 6, 8, 127, -128, 99 };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, text)
-{
-    std::string to_sort = "Hello, World!";
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, u16string)
-{
-    std::u16string to_sort = u"Hello, World!";
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, u32string)
-{
-    std::u32string to_sort = U"Hello, World!";
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, int16)
-{
-    std::vector<int16_t> to_sort = { 5, 6, 19, -4, 2, 5, 0, -55, 7, 1000, 23, 6, 8, 127, -128, -129, -256, -32768, 32767, 99 };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, uint16)
-{
-    std::vector<uint16_t> to_sort = { 5, 6, 19, 2, 5, 7, 0, 23, 6, 256, 255, 8, 99, 1024, 65535, 65534 };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, int32)
-{
-    std::vector<int32_t> to_sort = { 5, 6, 19, -4, 2, 5, 0, -55, 7, 1000, 23, 6, 8, 127, -128, -129, -256, 32768, -32769, -32768, 32767, 99, 1000000, -1000001, std::numeric_limits<int>::lowest(), std::numeric_limits<int>::max(), std::numeric_limits<int>::max() - 1, std::numeric_limits<int>::lowest() + 1 };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, uint32)
-{
-    std::vector<uint32_t> to_sort = { 5, 6, 19, 2, 5, 7, 0, 23, 6, 256, 255, 8, 99, 1024, 65536, 65535, 65534, 1000000, std::numeric_limits<unsigned int>::max() };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, int64)
-{
-    std::vector<int64_t> to_sort = { 5, 6, 19, std::numeric_limits<std::int32_t>::lowest() + 1, std::numeric_limits<ino64_t>::lowest(), -1000000000000, 1000000000000, std::numeric_limits<int32_t>::max(), std::numeric_limits<int64_t>::max(), -4, 2, 5, 0, -55, 7, 1000, 23, 6, 8, 127, -128, -129, -256, 32768, -32769, -32768, 32767, 99, 1000000, -1000001, std::numeric_limits<int>::lowest(), std::numeric_limits<int>::max(), std::numeric_limits<int>::max() - 1, std::numeric_limits<int>::lowest() + 1 };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, uint64)
-{
-    std::vector<uint64_t> to_sort = { 5, 6, 19, 2, 5, 7, 0, std::numeric_limits<uint32_t>::max() - 1, 1000000000000, std::numeric_limits<uint64_t>::max(), 23, 6, 256, 255, 8, 99, 1024, 65536, 65535, 65534, 1000000, std::numeric_limits<unsigned int>::max() };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, float)
-{
-    std::vector<float> to_sort = { 5, 6, 19, std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), -4, 2, 5, 0, -55, 7, 1000, 23, 6, 8, 127, -128, -129, -256, 32768, -32769, -32768, 32767, 99, 1000000, -1000001, 0.1f, 2.5f, 17.8f, -12.4f, -0.0000002f, -0.0f, -777777777.7f, 444444444444.4f };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, double)
-{
-    std::vector<double> to_sort = { 5, 6, 19, std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(), -4, 2, 5, 0, -55, 7, 1000, 23, 6, 8, 127, -128, -129, -256, 32768, -32769, -32768, 32767, 99, 1000000, -1000001, 0.1, 2.5, 17.8, -12.4, -0.0000002, -0.0, -777777777.7, 444444444444.4 };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-
-TEST(inplace_radix_sort, error_case)
+TEST(sort, error_case)
 {
     std::vector<int8_t> data = { 46, 7, 33, -78, -114, -78, 33, 82 };
-    std::vector<int8_t> copy = data;
-    std::sort(copy.begin(), copy.end());
-    inplace_radix_sort(data.begin(), data.end());
-    ASSERT_EQ(copy, data);
+    ASSERT_TRUE(TestAllSorts(data));
 }
 
-TEST(inplace_radix_sort, another_error_case)
+TEST(sort, another_error_case)
 {
     std::vector<int8_t> data = { -104, 50, 108, 105, 112, 53, 47, 102 };
-    std::vector<int8_t> copy = data;
-    std::sort(copy.begin(), copy.end());
-    inplace_radix_sort(data.begin(), data.end());
-    ASSERT_EQ(copy, data);
+    ASSERT_TRUE(TestAllSorts(data));
+}
+TEST(sort, two_extract_keys)
+{
+    struct WithInt
+    {
+        int i = 0;
+        bool operator<(const WithInt & other) const
+        {
+            return i < other.i;
+        }
+    };
+    struct WithArray
+    {
+        std::array<WithInt, 2> ints;
+        bool operator<(const WithArray & other) const
+        {
+            return ints < other.ints;
+        }
+    };
+
+    std::vector<WithArray> data;
+    data.push_back(WithArray{{{{1}, {5}}}});
+    data.push_back(WithArray{{{{1}, {-5}}}});
+    data.push_back(WithArray{{{{-1}, {5}}}});
+    data.push_back(WithArray{{{{-1}, {-5}}}});
+    data.push_back(WithArray{{{{5}, {1}}}});
+    data.push_back(WithArray{{{{-1}, {100}}}});
+    data.push_back(WithArray{{{{100}, {-1}}}});
+    data.push_back(WithArray{{{{100}, {20}}}});
+    data.push_back(WithArray{{{{100}, {-20}}}});
+    ska_sort(data.begin(), data.end(), &WithArray::ints, &WithInt::i);
+    ASSERT_TRUE(std::is_sorted(data.begin(), data.end()));
+}
+TEST(sort, two_extract_keys_from_variant)
+{
+    struct WithInt
+    {
+        int i = 0;
+        bool operator<(const WithInt & other) const
+        {
+            return i < other.i;
+        }
+    };
+    struct WithVariant
+    {
+        std::variant<WithInt, int> ints;
+        bool operator<(const WithVariant & other) const
+        {
+            return ints < other.ints;
+        }
+    };
+
+    std::vector<WithVariant> data;
+    data.push_back(WithVariant{{1}});
+    data.push_back(WithVariant{WithInt{1}});
+    data.push_back(WithVariant{WithInt{-1}});
+    data.push_back(WithVariant{WithInt{-10}});
+    data.push_back(WithVariant{WithInt{10}});
+    data.push_back(WithVariant{{-1}});
+    data.push_back(WithVariant{{10}});
+    data.push_back(WithVariant{{-10}});
+    ska_sort(data.begin(), data.end(), &WithVariant::ints, &WithInt::i);
+    ASSERT_TRUE(std::is_sorted(data.begin(), data.end()));
 }
 
-TEST(inplace_radix_sort, vector_bool)
-{
-    std::vector<bool> to_sort = { true, false, true, true, false, true, true, true, false, true, false, false };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, pair)
-{
-    std::vector<std::pair<int, bool>> to_sort =
-    {
-        { 5, true },
-        { 5, false },
-        { 6, false },
-        { 7, true },
-        { 4, false },
-        { 4, true }
-    };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, pair_other_direction)
-{
-    std::vector<std::pair<bool, int>> to_sort =
-    {
-        { true, 5 },
-        { false, 5 },
-        { false, 6 },
-        { true, 7 },
-        { false, 4 },
-        { true, 4 }
-    };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, reference)
-{
-    std::vector<int> to_sort = { 6, 5, 4, 3, 2, 1 };
-    inplace_radix_sort(to_sort.begin(), to_sort.end(), [](int & i) -> int & { return i; });
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, pair_reference)
-{
-    std::vector<std::pair<int, bool>> to_sort = { { 5, true }, { 5, false }, { 6, false }, { 7, true }, { 4, false }, { 4, true } };
-    inplace_radix_sort(to_sort.begin(), to_sort.end(), [](auto & i) -> decltype(auto) { return i; });
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-TEST(inplace_radix_sort, move_only)
-{
-    std::vector<std::unique_ptr<int>> to_sort;
-    to_sort.push_back(std::make_unique<int>(5));
-    to_sort.push_back(std::make_unique<int>(0));
-    to_sort.push_back(std::make_unique<int>(1234567));
-    to_sort.push_back(std::make_unique<int>(-1000));
-    std::vector<int> sorted;
-    sorted.reserve(to_sort.size());
-    for (const std::unique_ptr<int> & i : to_sort)
-        sorted.push_back(*i);
-    std::sort(sorted.begin(), sorted.end());
-    inplace_radix_sort(to_sort.begin(), to_sort.end(), [](auto & i){ return *i; });
-    for (size_t i = 0; i < sorted.size(); ++i)
-    {
-        ASSERT_EQ(sorted[i], *to_sort[i]);
-    }
-}
 #ifdef FULL_TESTS_SLOW_COMPILE_TIME
-TEST(inplace_radix_sort, tuple)
-{
-    std::vector<std::tuple<bool, int, bool>> to_sort = { std::tuple<bool, int, bool>{ true, 5, true }, std::tuple<bool, int, bool>{ true, 5, false }, std::tuple<bool, int, bool>{ false, 6, false }, std::tuple<bool, int, bool>{ true, 7, true }, std::tuple<bool, int, bool>{ true, 4, false }, std::tuple<bool, int, bool>{ false, 4, true }, std::tuple<bool, int, bool>{ false, 5, false } };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
-#endif
-
-#ifdef FULL_TESTS_SLOW_COMPILE_TIME
-TEST(inplace_radix_sort, nested_tuple)
+TEST(sort, nested_tuple)
 {
     std::vector<std::tuple<bool, std::pair<int, std::pair<int, int>>, std::tuple<bool, bool, bool>>> to_sort;
     to_sort.emplace_back(true, std::make_pair(5, std::make_pair(6, 7)), std::make_tuple(true, false, true));
@@ -550,12 +661,11 @@ TEST(inplace_radix_sort, nested_tuple)
     to_sort.emplace_back(false, std::make_pair(5, std::make_pair(7, 6)), std::make_tuple(true, true, false));
     to_sort.emplace_back(false, std::make_pair(5, std::make_pair(7, 6)), std::make_tuple(false, true, false));
     to_sort.emplace_back(false, std::make_pair(4, std::make_pair(7, 6)), std::make_tuple(false, true, false));
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
 #endif
 
-TEST(inplace_radix_sort, string)
+TEST(sort, string)
 {
     std::vector<std::string> to_sort =
     {
@@ -568,11 +678,10 @@ TEST(inplace_radix_sort, string)
         "Baz",
         "",
     };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
 }
 
-TEST(inplace_radix_sort, vector)
+TEST(sort, vector)
 {
     std::vector<std::vector<int>> to_sort =
     {
@@ -586,12 +695,11 @@ TEST(inplace_radix_sort, vector)
         { 1 },
         {},
     };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
 }
 
 #ifdef FULL_TESTS_SLOW_COMPILE_TIME
-TEST(inplace_radix_sort, string_in_vector)
+TEST(sort, string_in_vector)
 {
     std::vector<std::vector<std::string>> to_sort =
     {
@@ -606,16 +714,12 @@ TEST(inplace_radix_sort, string_in_vector)
         { "hi", "there", "I", "added", "more", "tests" },
         { "hi", "there", "needed", "the", "same", "prefix" },
     };
-    std::vector<std::vector<std::string>> copy = to_sort;
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-    std::sort(copy.begin(), copy.end());
-    ASSERT_EQ(copy, to_sort);
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
 }
 #endif
 
 #ifdef FULL_TESTS_SLOW_COMPILE_TIME
-TEST(inplace_radix_sort, vector_tuple_string)
+TEST(sort, vector_tuple_string)
 {
     std::vector<std::tuple<std::string, std::string>> to_sort;
     to_sort.emplace_back("hi", "there");
@@ -636,20 +740,51 @@ TEST(inplace_radix_sort, vector_tuple_string)
     to_sort.emplace_back("hi", "there");
     to_sort.emplace_back("needed", "the");
     to_sort.emplace_back("same", "prefix");
-    std::vector<std::tuple<std::string, std::string>> copy = to_sort;
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-    std::sort(copy.begin(), copy.end());
-    ASSERT_EQ(copy, to_sort);
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
+}
+TEST(sort, vector_vector_tuple_string)
+{
+    std::vector<std::vector<std::tuple<std::string, std::string>>> to_sort;
+    to_sort.emplace_back(std::vector<std::tuple<std::string, std::string>>
+    {
+        {"hi", "there"},
+        {"you", "are"},
+        {"probably", "not"}
+    });
+    to_sort.emplace_back(std::vector<std::tuple<std::string, std::string>>
+    {
+        {"going", "to"},
+        {"pass", ""},
+        {"", ""}
+    });
+    to_sort.emplace_back(std::vector<std::tuple<std::string, std::string>>
+    {
+        {"", "this"},
+        {"test", "the"},
+        {"first", "time"},
+    });
+    to_sort.emplace_back(std::vector<std::tuple<std::string, std::string>>
+    {
+        {"oh it did pass", "n"},
+        {"e", "a"},
+        {"t!", ""},
+    });
+    to_sort.emplace_back(std::vector<std::tuple<std::string, std::string>>
+    {
+        {"hi", "there"},
+        {"I", "added"},
+        {"more", "tests"},
+    });
+    to_sort.emplace_back(std::vector<std::tuple<std::string, std::string>>
+    {
+        {"hi", "there"},
+        {"needed", "the"},
+        {"same", "prefix"},
+    });
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
 }
 #endif
 
-TEST(inplace_radix_sort, std_array)
-{
-    std::vector<std::array<float, 4>> to_sort = { {{ 1.0f, 2.0f, 3.0f, 4.0f }}, {{ 0.0f, 3.0f, 4.0f, 5.0f }}, {{ 1.0f, 1.5f, 2.0f, 2.5f }}, {{ 1.0f, 2.0f, 2.5f, 4.0f }}, {{ 1.0f, 2.0f, 2.5f, 3.5f }}, {{ 0.0f, 3.0f, 4.5f, 4.5f }} };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
-}
 TEST(inplace_radix_sort, pointers)
 {
     int array[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
@@ -665,16 +800,13 @@ TEST(inplace_radix_sort, pointers)
         array + 4,
         array + 5
     };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
 /*#include <list>
-TEST(inplace_radix_sort, vector_of_list)
+TEST(sort, vector_of_list)
 {
     std::vector<std::list<int>> to_sort = { { 1, 2, 3 }, { 1, 2, 2 }, { 0, 1, 2 } };
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    //radix_sort(to_sort.begin(), to_sort.end(), to_sort.begin());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }*/
 
 struct MovableInt
@@ -707,7 +839,7 @@ int to_radix_sort_key(const MovableInt & i)
     return i.i;
 }
 
-TEST(inplace_radix_sort, vector_of_movables)
+TEST(sort, vector_of_movables)
 {
     std::vector<std::vector<MovableInt>> to_sort;
     to_sort.emplace_back();
@@ -726,11 +858,10 @@ TEST(inplace_radix_sort, vector_of_movables)
     to_sort.back().emplace_back(2); to_sort.back().emplace_back(3); to_sort.back().emplace_back(4);
     to_sort.emplace_back();
     to_sort.back().emplace_back(-2); to_sort.back().emplace_back(-3); to_sort.back().emplace_back(-4);
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
 }
 
-TEST(radix_sort, movables)
+TEST(sort, movables)
 {
     std::vector<MovableInt> to_sort;
     to_sort.emplace_back(1);
@@ -739,16 +870,11 @@ TEST(radix_sort, movables)
     to_sort.emplace_back(-1);
     to_sort.emplace_back(20);
     to_sort.emplace_back(-5);
-    std::vector<MovableInt> buffer(to_sort.size());
-    bool which_buffer = radix_sort(to_sort.begin(), to_sort.end(), buffer.begin());
-    if (which_buffer)
-        ASSERT_TRUE(std::is_sorted(buffer.begin(), buffer.end()));
-    else
-        ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+    ASSERT_TRUE(TestAllSorts(to_sort));
 }
 
 #ifdef FULL_TESTS_SLOW_COMPILE_TIME
-TEST(inplace_radix_sort, vector_of_vector_of_movables)
+TEST(sort, vector_of_vector_of_movables)
 {
     std::vector<std::vector<std::vector<MovableInt>>> to_sort;
     to_sort.emplace_back();
@@ -763,13 +889,12 @@ TEST(inplace_radix_sort, vector_of_vector_of_movables)
     to_sort.back().emplace_back();
     to_sort.back().back().emplace_back(1); to_sort.back().back().emplace_back(2);
     to_sort.back().back().emplace_back(1); to_sort.back().back().emplace_back(2);
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
 }
 #endif
 
 #ifdef FULL_TESTS_SLOW_COMPILE_TIME
-TEST(inplace_radix_sort, vector_vector_vector)
+TEST(sort, vector_vector_vector)
 {
     std::vector<std::vector<std::vector<std::vector<int>>>> to_sort;
     to_sort.emplace_back();
@@ -801,15 +926,14 @@ TEST(inplace_radix_sort, vector_vector_vector)
     to_sort.back().emplace_back();
     to_sort.back().back().emplace_back();
     to_sort.back().back().back().emplace_back(1); to_sort.back().back().back().emplace_back(2);
-    ASSERT_FALSE(std::is_sorted(to_sort.begin(), to_sort.end()));
-    inplace_radix_sort(to_sort.begin(), to_sort.end());
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
 }
 #endif
 
 struct MovableString : private std::string
 {
     using std::string::string;
+    MovableString() = default;
     MovableString(const MovableString &) = delete;
     MovableString & operator=(const MovableString &) = delete;
     MovableString(MovableString &&) = default;
@@ -828,6 +952,7 @@ struct MovableString : private std::string
 
 struct Customer
 {
+    Customer() = default;
     Customer(MovableString && first, MovableString && second)
         : first_name(std::move(first)), last_name(std::move(second))
     {
@@ -837,7 +962,7 @@ struct Customer
     MovableString last_name;
 };
 
-TEST(inplace_radix_sort, no_copy)
+TEST(sort, no_copy)
 {
     // sorting customers by last name then first name
     // I want to return references. I use a MovableString
@@ -849,23 +974,129 @@ TEST(inplace_radix_sort, no_copy)
     to_sort.emplace_back("g", "a");
     to_sort.emplace_back("w", "d");
     to_sort.emplace_back("b", "c");
-    std::string a;
-    std::string b = a;
-    a = b;
-    inplace_radix_sort(to_sort.begin(), to_sort.end(), [](const Customer & customer)
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort, [](const Customer & customer)
     {
         return std::tie(customer.last_name, customer.first_name);
-    });
-    auto sort_by_last_name = [](const Customer & a, const Customer & b)
+    }));
+}
+
+struct ThrowingType
+{
+    operator int() const
     {
-        if (a.last_name < b.last_name)
-            return true;
-        else if (b.last_name < a.last_name)
-            return false;
-        else
-            return a.first_name < b.first_name;
+        throw 5;
+    }
+};
+
+TEST(sort, variant)
+{
+    std::vector<std::variant<int, std::string, float>> to_sort;
+    to_sort.emplace_back(5);
+    to_sort.emplace_back(0);
+    to_sort.emplace_back("foo");
+    to_sort.emplace_back("foo");
+    to_sort.emplace_back("foo");
+    to_sort.emplace_back("bar");
+    to_sort.emplace_back(1.0f);
+    to_sort.emplace_back(-2.0f);
+    to_sort.emplace_back(-1);
+    to_sort.emplace_back("baz3");
+    to_sort.emplace_back("baz");
+    to_sort.emplace_back("baz2");
+    to_sort.emplace_back(7.0f);
+    ASSERT_THROW(to_sort[2].emplace<0>(ThrowingType()), int);
+    ASSERT_TRUE(to_sort[2].valueless_by_exception());
+    ASSERT_THROW(to_sort[3].emplace<0>(ThrowingType()), int);
+    ASSERT_TRUE(to_sort[3].valueless_by_exception());
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
+}
+
+TEST(sort, variant_in_pair)
+{
+    std::vector<std::pair<std::variant<int, float, std::string>, int>> to_sort;
+    to_sort.emplace_back(5, 5);
+    to_sort.emplace_back(0, 4);
+    to_sort.emplace_back("foo", 2);
+    to_sort.emplace_back("foo", 1);
+    to_sort.emplace_back("foo", 3);
+    to_sort.emplace_back(5, 3);
+    to_sort.emplace_back(5, 1);
+    to_sort.emplace_back(0, 8);
+    to_sort.emplace_back(0, 2);
+    to_sort.emplace_back(1.0f, 2);
+    to_sort.emplace_back(1.0f, 21);
+    to_sort.emplace_back(-2.0f, 3);
+    to_sort.emplace_back(-2.0f, 4);
+    to_sort.emplace_back(1.0f, -3);
+    to_sort.emplace_back(1.0f, 3);
+    to_sort.emplace_back(-2.0f, 2);
+    ASSERT_THROW(to_sort[2].first.emplace<0>(ThrowingType()), int);
+    ASSERT_TRUE(to_sort[2].first.valueless_by_exception());
+    ASSERT_THROW(to_sort[3].first.emplace<0>(ThrowingType()), int);
+    ASSERT_TRUE(to_sort[3].first.valueless_by_exception());
+    ASSERT_THROW(to_sort[4].first.emplace<0>(ThrowingType()), int);
+    ASSERT_TRUE(to_sort[4].first.valueless_by_exception());
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
+}
+TEST(sort, variant_in_vector)
+{
+    std::vector<std::vector<std::variant<int, float, std::string>>> to_sort =
+    {
+        { 5, 6, 2, 1.0f, 3.1f },
+        { 5.0f, 6.0f, 2, 1, 3.1f },
+        { 5.0f, 6, 2.0f, 1, 3.1f },
+        { 5, 6.0f, 2, 1, 3 },
+        { 5, 6.0f, 2, 1, 3.1f },
+        { 5.0f, 6, 2.1f, 1, 3 },
+        { 5.0f, 6, 1.9f, 1, 3.1f },
+        { 5.0f, 6, 1.9f, 1, 3.1f, "foo2" },
+        { 5.0f, 6, 1.9f, 1, 3.1f, "foo3" },
+        { 5.0f, 6, 1.9f, 1, 3.1f, "foo4" },
+        { 5.0f, 6, 1.9f, 1, 3.1f, "foo1" },
     };
-    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end(), sort_by_last_name));
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
+}
+
+TEST(sort, optional)
+{
+    std::vector<std::optional<int>> to_sort;
+    to_sort.emplace_back(5);
+    to_sort.emplace_back(std::nullopt);
+    to_sort.emplace_back(6);
+    to_sort.emplace_back(-3);
+    to_sort.emplace_back(2);
+    to_sort.emplace_back(7);
+    to_sort.emplace_back(std::nullopt);
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
+}
+
+TEST(sort, optional_in_pair)
+{
+    std::vector<std::pair<std::optional<int>, int>> to_sort;
+    to_sort.emplace_back(5, 5);
+    to_sort.emplace_back(std::nullopt, 4);
+    to_sort.emplace_back(std::nullopt, 3);
+    to_sort.emplace_back(std::nullopt, 8);
+    to_sort.emplace_back(5, 2);
+    to_sort.emplace_back(5, 100);
+    to_sort.emplace_back(-5, 100);
+    to_sort.emplace_back(-5, 2);
+    to_sort.emplace_back(-5, 3);
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
+}
+TEST(sort, optional_in_vector)
+{
+    std::vector<std::vector<std::optional<int>>> to_sort =
+    {
+        { 5, 6, 2, std::nullopt },
+        { 5, 3, 2, std::nullopt },
+        { 5, std::nullopt, 2, std::nullopt },
+        { 5, std::nullopt, 4, std::nullopt },
+        { 5, std::nullopt, 1, std::nullopt },
+        { std::nullopt, std::nullopt, 1, std::nullopt },
+        { std::nullopt, std::nullopt, 0, std::nullopt },
+    };
+    ASSERT_TRUE(TestVariableSizeSorts(to_sort));
 }
 
 #endif
@@ -1265,7 +1496,7 @@ BENCHMARK(benchmark_radix_sort)->RangeMultiplier(profile_multiplier)->Range(prof
 #endif
 
 #if 0
-static void benchmark_ska_sort_copy(benchmark::State & state)
+static void benchmark_ska_sort_ping_pong(benchmark::State & state)
 {
     std::mt19937_64 randomness(77342348);
     auto buffer = create_radix_sort_data(randomness, state.range(0));
@@ -1273,9 +1504,9 @@ static void benchmark_ska_sort_copy(benchmark::State & state)
     {
         auto to_sort = create_radix_sort_data(randomness, state.range(0));
 #ifdef SORT_ON_FIRST_ONLY
-        ska_sort_copy(to_sort.begin(), to_sort.end(), buffer.begin(), [](auto && a) -> decltype(auto){ return std::get<0>(a); });
+        ska_sort_ping_pong(to_sort.begin(), to_sort.end(), buffer.begin(), [](auto && a) -> decltype(auto){ return std::get<0>(a); });
 #else
-        bool which = ska_sort_copy(to_sort.begin(), to_sort.end(), buffer.begin());
+        bool which = ska_sort_ping_pong(to_sort.begin(), to_sort.end(), buffer.begin());
         if (which)
             assert(std::is_sorted(buffer.begin(), buffer.end()));
         else
@@ -1285,7 +1516,7 @@ static void benchmark_ska_sort_copy(benchmark::State & state)
         benchmark::DoNotOptimize(buffer.data());
     }
 }
-BENCHMARK(benchmark_ska_sort_copy)->RangeMultiplier(profile_multiplier)->Range(profile_multiplier, max_profile_range);
+BENCHMARK(benchmark_ska_sort_ping_pong)->RangeMultiplier(profile_multiplier)->Range(profile_multiplier, max_profile_range);
 #endif
 
 #if 1
@@ -1489,3 +1720,510 @@ TEST(benchmark, inplace_faster)
 #endif
 
 #endif
+
+#if 1
+#include <custom_benchmark/custom_benchmark.h>
+#include "hashtable_benchmarks/benchmark_shared.hpp"
+#include <boost/sort/sort.hpp>
+#include "util/ska_sort2.hpp"
+
+
+template<size_t Size>
+struct IntWithPadding
+{
+    int to_sort_on;
+    int padding[Size / 4 - 1];
+
+    IntWithPadding(int value)
+        : to_sort_on(value)
+    {
+        std::fill(std::begin(padding), std::end(padding), value);
+    }
+
+    bool operator<(const IntWithPadding & other) const
+    {
+        return to_sort_on < other.to_sort_on;
+    }
+};
+template<size_t Size>
+int to_radix_sort_key(const IntWithPadding<Size> & int_with_padding)
+{
+    return int_with_padding.to_sort_on;
+}
+template<typename>
+struct IsIntWithPadding
+{
+    static constexpr bool value = false;
+};
+template<size_t Size>
+struct IsIntWithPadding<IntWithPadding<Size>>
+{
+    static constexpr bool value = true;
+};
+
+template<typename T>
+struct SortInput
+{
+    static SKA_NOINLINE(std::vector<T>) sort_input(size_t num_items)
+    {
+        std::uniform_int_distribution<T> distribution;
+        std::vector<T> result(num_items);
+        for (T & item : result)
+            item = distribution(global_randomness);
+        return result;
+    }
+};
+template<size_t Size>
+struct SortInput<IntWithPadding<Size>>
+{
+    static SKA_NOINLINE(std::vector<IntWithPadding<Size>>) sort_input(size_t num_items)
+    {
+        std::uniform_int_distribution<int> distribution;
+        std::vector<IntWithPadding<Size>> result;
+        result.reserve(num_items);
+        for (size_t i = 0; i < num_items; ++i)
+            result.emplace_back(distribution(global_randomness));
+        return result;
+    }
+};
+template<>
+struct SortInput<float>
+{
+    static SKA_NOINLINE(std::vector<float>) sort_input(size_t num_items)
+    {
+        std::normal_distribution<float> distribution(0.0f, 1000.0f);
+        std::vector<float> result(num_items);
+        for (float & item : result)
+            item = distribution(global_randomness);
+        return result;
+    }
+};
+extern const std::vector<const char *> & get_word_list();
+extern const std::vector<const char *> & get_kern_log();
+template<>
+struct SortInput<std::string>
+{
+    static SKA_NOINLINE(std::vector<std::string>) sort_input(size_t num_items)
+    {
+        std::uniform_int_distribution<int> list_choice(0, 10);
+        std::uniform_int_distribution<int> num_words(1, 10);
+        const std::vector<const char *> & word_list = get_word_list();
+        const std::vector<const char *> & kern_log = get_kern_log();
+        std::uniform_int_distribution<size_t> random_word(0, word_list.size() - 1);
+        std::uniform_int_distribution<size_t> random_log(0, kern_log.size() - 1);
+        std::vector<std::string> result(num_items);
+        for (std::string & item : result)
+        {
+            if (list_choice(global_randomness) != 0)
+            {
+                for (int i = 0, end = num_words(global_randomness); i < end; ++i)
+                {
+                    item += word_list[random_word(global_randomness)];
+                }
+            }
+            else
+            {
+                item = kern_log[random_log(global_randomness)];
+            }
+        }
+        return result;
+    }
+};
+
+template<typename It>
+SKA_NOINLINE(void) noinline_shuffle(It begin, It end)
+{
+    std::shuffle(begin, end, global_randomness);
+}
+
+template<typename T, typename SortSettings = detail::DefaultSortSettings>
+void benchmark_ska_sort(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        detail::ska_sort_with_settings<SortSettings>(input.begin(), input.end());
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+template<typename T, typename SortSettings = detail::DefaultSortSettings>
+void benchmark_ska_sort2(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        detail::ska_sort2_with_settings<SortSettings>(input.begin(), input.end());
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+    ska_sort2(input.begin(), input.end());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(input.begin(), input.end()));
+}
+template<typename T>
+void benchmark_american_flag_sort(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        american_flag_sort(input.begin(), input.end());
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+template<typename T>
+void benchmark_ska_sort_ping_pong(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    std::vector<T> copy(input);
+    while (state.KeepRunning())
+    {
+        if (ska_sort_ping_pong(input.begin(), input.end(), copy.begin()))
+            input.swap(copy);
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+template<typename T, typename SortSettings = detail::DefaultSortSettings>
+void benchmark_counting_sort_ping_pong(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    std::vector<T> copy(input);
+    while (state.KeepRunning())
+    {
+        if (counting_sort_ping_pong<SortSettings>(input.begin(), input.end(), copy.begin()))
+            input.swap(copy);
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+template<typename T, size_t InsertionSortUpperLimit>
+void benchmark_counting_sort_ping_pong_configurable(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    std::vector<T> copy(input);
+    while (state.KeepRunning())
+    {
+        if (counting_sort_ping_pong_configurable<InsertionSortUpperLimit>(input.begin(), input.end(), copy.begin()))
+            input.swap(copy);
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+template<typename T, size_t InsertionSortUpperLimit, std::ptrdiff_t AmericanFlagSortUpperLimit = detail::DefaultSortSettings::AmericanFlagSortUpperLimit>
+void benchmark_ska_sort_configurable(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        ska_sort_configurable<InsertionSortUpperLimit, AmericanFlagSortUpperLimit>(input.begin(), input.end());
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>
+         , std::ptrdiff_t AmericanFlagSortUpperLimit = detail::DefaultSortSettings::AmericanFlagSortUpperLimit
+         , size_t FirstLoopUnrollAmount = detail::DefaultSortSettings::FirstLoopUnrollAmount
+         , size_t SecondLoopUnrollAmount = detail::DefaultSortSettings::SecondLoopUnrollAmount
+         , bool UseIndexSort = detail::DefaultSortSettings::UseIndexSort
+         , bool UseFasterCompare = detail::DefaultSortSettings::UseFasterCompare, typename It, typename ExtractKey>
+void ska_sort2_configurable(It begin, It end, ExtractKey && extract_key)
+{
+    detail::ska_sort2_with_settings<ConfigurableSettings<InsertionSortUpperLimit, AmericanFlagSortUpperLimit, detail::DefaultSortSettings::ThreeWaySwap, FirstLoopUnrollAmount, SecondLoopUnrollAmount, UseIndexSort, UseFasterCompare>>(begin, end, extract_key);
+}
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>
+         , std::ptrdiff_t AmericanFlagSortUpperLimit = detail::DefaultSortSettings::AmericanFlagSortUpperLimit
+         , size_t FirstLoopUnrollAmount = detail::DefaultSortSettings::FirstLoopUnrollAmount
+         , size_t SecondLoopUnrollAmount = detail::DefaultSortSettings::SecondLoopUnrollAmount
+         , bool UseIndexSort = detail::DefaultSortSettings::UseIndexSort
+         , bool UseFasterCompare = detail::DefaultSortSettings::UseFasterCompare, typename It>
+void ska_sort2_configurable(It begin, It end)
+{
+    ska_sort2_configurable<InsertionSortUpperLimit, AmericanFlagSortUpperLimit, FirstLoopUnrollAmount, SecondLoopUnrollAmount, UseIndexSort, UseFasterCompare>(begin, end, detail::IdentityFunctor());
+}
+template<typename T, size_t InsertionSortUpperLimit
+                   , std::ptrdiff_t AmericanFlagSortUpperLimit = detail::DefaultSortSettings::AmericanFlagSortUpperLimit
+                   , size_t FirstLoopUnrollAmount = detail::DefaultSortSettings::FirstLoopUnrollAmount
+                   , size_t SecondLoopUnrollAmount = detail::DefaultSortSettings::SecondLoopUnrollAmount
+                   , bool UseIndexSort = detail::DefaultSortSettings::UseIndexSort
+                   , bool UseFasterCompare = detail::DefaultSortSettings::UseFasterCompare>
+void benchmark_ska_sort2_configurable(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        ska_sort2_configurable<InsertionSortUpperLimit, AmericanFlagSortUpperLimit, FirstLoopUnrollAmount, SecondLoopUnrollAmount, UseIndexSort, UseFasterCompare>(input.begin(), input.end());
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+    ska_sort2(input.begin(), input.end());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(input.begin(), input.end()));
+}
+template<typename T, size_t InsertionSortUpperLimit, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap>
+void benchmark_ska_byte_sort_configurable(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        ska_byte_sort_configurable<InsertionSortUpperLimit, ThreeWaySwap>(input.begin(), input.end());
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+template<typename T, size_t InsertionSortUpperLimit, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap>
+void benchmark_american_flag_sort_configurable(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        american_flag_sort_configurable<InsertionSortUpperLimit, ThreeWaySwap>(input.begin(), input.end());
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+template<typename T>
+void benchmark_std_sort(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        std::sort(input.begin(), input.end());
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+template<typename T>
+void benchmark_spreadsort(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        boost::sort::spreadsort::spreadsort(input.begin(), input.end());
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+#include "Raduls/raduls.h"
+#include <cstdlib>
+template<typename T>
+struct benchmark_raduls
+{
+    int num_threads = 1;
+    void operator()(skb::State & state) const
+    {
+        size_t num_items = state.range(0);
+        std::vector<T> input = SortInput<T>::sort_input(num_items);
+        for (T & int_with_padding : input)
+        {
+            int_with_padding.padding[0] = 0;
+        }
+        auto dealloc_with_free = [](void * ptr)
+        {
+            if (ptr)
+                free(ptr);
+        };
+        std::unique_ptr<void, decltype(dealloc_with_free)> input_aligned(std::aligned_alloc(256, sizeof(T) * num_items), dealloc_with_free);
+        std::unique_ptr<void, decltype(dealloc_with_free)> tmp(std::aligned_alloc(256, sizeof(T) * num_items), dealloc_with_free);
+        T * aligned_begin = static_cast<T *>(input_aligned.get());
+        T * aligned_end = aligned_begin + num_items;
+        std::uninitialized_copy(input.begin(), input.end(), aligned_begin);
+        std::uninitialized_fill(static_cast<T *>(tmp.get()), static_cast<T *>(tmp.get()) + num_items, T(0));
+        while (state.KeepRunning())
+        {
+            raduls::RadixSortMSD(reinterpret_cast<uint8_t*>(aligned_begin), reinterpret_cast<uint8_t*>(tmp.get()), num_items, sizeof(T), 4, num_threads);
+            noinline_shuffle(aligned_begin, aligned_end);
+        }
+        state.SetItemsProcessed(state.iterations() * num_items);
+        raduls::RadixSortMSD(reinterpret_cast<uint8_t*>(aligned_begin), reinterpret_cast<uint8_t*>(tmp.get()), num_items, sizeof(T), 4, num_threads);
+        CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(aligned_begin, aligned_end));
+    }
+};
+template<typename T>
+void benchmark_insertion_sort(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        detail::insertion_sort(input.begin(), input.end(), std::less<>{});
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+template<typename T>
+void benchmark_index_sort(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        detail::index_sort(input.begin(), input.end(), std::less<>{});
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+template<typename T>
+void benchmark_sort_baseline(skb::State & state)
+{
+    size_t num_items = state.range(0);
+    std::vector<T> input = SortInput<T>::sort_input(num_items);
+    while (state.KeepRunning())
+    {
+        noinline_shuffle(input.begin(), input.end());
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+
+template<typename T>
+static skb::Benchmark * SortRange(skb::Benchmark * benchmark, double range_multiplier = std::sqrt(2.0))
+{
+    int max = 256 * 1024 * 1024;
+    //if (sizeof(T) < sizeof(int))
+    //    max = std::min(max, static_cast<int>(std::numeric_limits<T>::max()));
+    return benchmark->SetRange(4, max)->SetRangeMultiplier(range_multiplier);
+}
+
+template<>
+skb::Benchmark * SortRange<std::string>(skb::Benchmark * benchmark, double range_multiplier)
+{
+    int max = 4 * 1024 * 1024;
+    return benchmark->SetRange(4, max)->SetRangeMultiplier(range_multiplier);
+}
+
+struct Uint32SortSettings : detail::DefaultSortSettings
+{
+    using count_type = uint32_t;
+};
+
+struct Int32SortSettings : detail::DefaultSortSettings
+{
+    using count_type = int32_t;
+};
+
+template<typename T, size_t StdSortFallback, size_t FirstLoopUnrollAmount, size_t SecondLoopUnrollAmount>
+void RegisterSortForTypeAndUnrollAmount(skb::CategoryBuilder categories_so_far, const std::string & benchmark_type, const std::string & baseline_name)
+{
+    categories_so_far = categories_so_far.AddCategory("first_loop_unroll", std::to_string(FirstLoopUnrollAmount)).AddCategory("second_loop_unroll", std::to_string(SecondLoopUnrollAmount));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2_configurable<T, StdSortFallback, detail::DefaultSortSettings::AmericanFlagSortUpperLimit, FirstLoopUnrollAmount, SecondLoopUnrollAmount>, categories_so_far.BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
+}
+
+template<typename T, size_t StdSortFallback>
+void RegisterSortForTypeAndFallback(skb::CategoryBuilder categories_so_far, const std::string & benchmark_type, const std::string & baseline_name)
+{
+    categories_so_far = categories_so_far.AddCategory("std_sort_upper_limit", std::to_string(StdSortFallback));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_counting_sort_ping_pong_configurable<T, StdSortFallback>, categories_so_far.BuildCategories(benchmark_type, "counting_sort_ping_pong"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort_configurable<T, StdSortFallback>, categories_so_far.BuildCategories(benchmark_type, "ska_sort"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2_configurable<T, StdSortFallback>, categories_so_far.BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2_configurable<T, StdSortFallback, detail::DefaultSortSettings::AmericanFlagSortUpperLimit, detail::DefaultSortSettings::FirstLoopUnrollAmount, detail::DefaultSortSettings::SecondLoopUnrollAmount, true>, categories_so_far.AddCategory("optimizations", "index_sort").BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2_configurable<T, StdSortFallback, detail::DefaultSortSettings::AmericanFlagSortUpperLimit, detail::DefaultSortSettings::FirstLoopUnrollAmount, detail::DefaultSortSettings::SecondLoopUnrollAmount, detail::DefaultSortSettings::UseIndexSort, !detail::DefaultSortSettings::UseFasterCompare>, categories_so_far.AddCategory("optimizations", detail::DefaultSortSettings::UseFasterCompare ? "no faster compare" : "faster compare").BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_byte_sort_configurable<T, StdSortFallback>, categories_so_far.BuildCategories(benchmark_type, "ska_byte_sort"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_byte_sort_configurable<T, StdSortFallback, true>, categories_so_far.AddCategory("optimizations", "three way swap").BuildCategories(benchmark_type, "ska_byte_sort"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_american_flag_sort_configurable<T, StdSortFallback>, categories_so_far.BuildCategories(benchmark_type, "american_flag_sort"))->SetBaseline(baseline_name));
+
+    /*RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 1, 1>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 1, 2>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 1, 4>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 1, 8>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 2, 1>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 2, 2>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 2, 4>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 2, 8>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 4, 1>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 4, 2>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 4, 4>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 4, 8>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 8, 1>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 8, 2>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 8, 4>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 8, 8>(categories_so_far, benchmark_type, baseline_name);*/
+}
+template<typename T, size_t AmericanFlagSortUpperLimit>
+void RegisterSortForTypeAndAmericanFlagSortLimit(skb::CategoryBuilder categories_so_far, const std::string & benchmark_type, const std::string & baseline_name)
+{
+    categories_so_far = categories_so_far.AddCategory("american_flag_sort_upper_limit", std::to_string(AmericanFlagSortUpperLimit));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort_configurable<T, detail::DefaultSortSettings::InsertionSortUpperLimit<int>, AmericanFlagSortUpperLimit>, categories_so_far.BuildCategories(benchmark_type, "ska_sort"))->SetBaseline(baseline_name));
+}
+
+template<typename T>
+void RegisterSortForType(skb::CategoryBuilder categories_so_far, const std::string & sorted_type, const std::string & baseline_type)
+{
+    categories_so_far = categories_so_far.AddCategory("sorted_type", sorted_type);
+    std::string baseline_name = "baseline_sorting_" + baseline_type;
+    SKA_BENCHMARK_NAME(benchmark_sort_baseline<T>, "baseline", baseline_name);
+    std::string benchmark_type = "sorting";
+
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_std_sort<T>, categories_so_far.BuildCategories(benchmark_type, "std::sort"))->SetBaseline(baseline_name));
+    //SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_american_flag_sort<T>, categories_so_far.BuildCategories(benchmark_type, "american_flag_sort"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort<T>, categories_so_far.BuildCategories(benchmark_type, "ska_sort"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2<T>, categories_so_far.BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
+    if constexpr (!std::is_same_v<T, std::string>)
+    {
+        SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort_ping_pong<T>, categories_so_far.BuildCategories(benchmark_type, "ska_sort_ping_pong"))->SetBaseline(baseline_name));
+    }
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_counting_sort_ping_pong<T>, categories_so_far.BuildCategories(benchmark_type, "counting_sort_ping_pong"))->SetBaseline(baseline_name));
+
+
+    //auto with_uint32 = &benchmark_counting_sort_ping_pong<T, Uint32SortSettings>;
+    //SortRange<T>(SKA_BENCHMARK_CATEGORIES(with_uint32, categories_so_far.AddCategory("count_type", "uint32").BuildCategories(benchmark_type, "counting_sort_ping_pong"))->SetBaseline(baseline_name));
+
+    //auto with_int32 = &benchmark_counting_sort_ping_pong<T, Int32SortSettings>;
+    //SortRange<T>(SKA_BENCHMARK_CATEGORIES(with_int32, categories_so_far.AddCategory("count_type", "int32").BuildCategories(benchmark_type, "counting_sort_ping_pong"))->SetBaseline(baseline_name));
+
+    //RegisterSortForTypeAndFallback<T, 1>(categories_so_far, benchmark_type, baseline_name);
+    //RegisterSortForTypeAndFallback<T, 4>(categories_so_far, benchmark_type, baseline_name);
+    //RegisterSortForTypeAndFallback<T, 8>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndFallback<T, 16>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndFallback<T, 24>(categories_so_far, benchmark_type, baseline_name);
+    RegisterSortForTypeAndFallback<T, 32>(categories_so_far, benchmark_type, baseline_name);
+    //RegisterSortForTypeAndFallback<T, 64>(categories_so_far, benchmark_type, baseline_name);
+
+    //RegisterSortForTypeAndAmericanFlagSortLimit<T, 1024>(categories_so_far, benchmark_type, baseline_name);
+    //RegisterSortForTypeAndAmericanFlagSortLimit<T, 1536>(categories_so_far, benchmark_type, baseline_name);
+    //RegisterSortForTypeAndAmericanFlagSortLimit<T, 2048>(categories_so_far, benchmark_type, baseline_name);
+    //RegisterSortForTypeAndAmericanFlagSortLimit<T, 3072>(categories_so_far, benchmark_type, baseline_name);
+    //RegisterSortForTypeAndAmericanFlagSortLimit<T, 4096>(categories_so_far, benchmark_type, baseline_name);
+
+    if constexpr (!IsIntWithPadding<T>::value)
+    {
+        SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_spreadsort<T>, categories_so_far.BuildCategories(benchmark_type, "boost::spreadsort"))->SetBaseline(baseline_name));
+    }
+    else if constexpr (sizeof(T) <= raduls::MAX_REC_SIZE_IN_BYTES)
+    {
+        SortRange<T>(SKA_BENCHMARK_CATEGORIES(benchmark_raduls<T>{1}, categories_so_far.AddCategory("num threads", "1").BuildCategories(benchmark_type, "RADULS2"))->SetBaseline(baseline_name));
+        SortRange<T>(SKA_BENCHMARK_CATEGORIES(benchmark_raduls<T>{2}, categories_so_far.AddCategory("num threads", "2").BuildCategories(benchmark_type, "RADULS2"))->SetBaseline(baseline_name));
+        SortRange<T>(SKA_BENCHMARK_CATEGORIES(benchmark_raduls<T>{4}, categories_so_far.AddCategory("num threads", "4").BuildCategories(benchmark_type, "RADULS2"))->SetBaseline(baseline_name));
+        SortRange<T>(SKA_BENCHMARK_CATEGORIES(benchmark_raduls<T>{8}, categories_so_far.AddCategory("num threads", "8").BuildCategories(benchmark_type, "RADULS2"))->SetBaseline(baseline_name));
+        SortRange<T>(SKA_BENCHMARK_CATEGORIES(benchmark_raduls<T>{16}, categories_so_far.AddCategory("num threads", "16").BuildCategories(benchmark_type, "RADULS2"))->SetBaseline(baseline_name));
+    }
+    SKA_BENCHMARK_CATEGORIES(&benchmark_insertion_sort<T>, categories_so_far.BuildCategories(benchmark_type, "insertion sort"))->SetBaseline(baseline_name)->SetRange(4, 1024)->SetRangeMultiplier(std::sqrt(2.0));
+    SKA_BENCHMARK_CATEGORIES(&benchmark_index_sort<T>, categories_so_far.BuildCategories(benchmark_type, "index sort"))->SetBaseline(baseline_name)->SetRange(4, 32)->SetRangeMultiplier(std::sqrt(2.0));
+}
+
+void RegisterSorting()
+{
+    skb::CategoryBuilder categories_so_far;
+    RegisterSortForType<int>(categories_so_far, "int", "int");
+    RegisterSortForType<uint8_t>(categories_so_far, "uint8_t", "uint8_t");
+    RegisterSortForType<float>(categories_so_far, "float", "float");
+    RegisterSortForType<std::string>(categories_so_far, "string", "string");
+
+    RegisterSortForType<IntWithPadding<8>>(categories_so_far.AddCategory("struct size", "8"), "int", "int_size_8");
+    RegisterSortForType<IntWithPadding<16>>(categories_so_far.AddCategory("struct size", "16"), "int", "int_size_16");
+    RegisterSortForType<IntWithPadding<32>>(categories_so_far.AddCategory("struct size", "32"), "int", "int_size_32");
+    RegisterSortForType<IntWithPadding<64>>(categories_so_far.AddCategory("struct size", "64"), "int", "int_size_64");
+}
+
+#endif
+

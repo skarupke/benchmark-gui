@@ -64,7 +64,7 @@ struct MaxSupportedLoadFactor<ska::inplace_linear_search_map<K, V, A>>
 
 void RegisterLinearSearch()
 {
-    CategoryBuilder categories_so_far;
+    skb::CategoryBuilder categories_so_far;
     using Allocator = counting_allocator<std::pair<KeyPlaceHolder, ValuePlaceHolder>>;
     RegisterLookups<ska::linear_search_map<KeyPlaceHolder, ValuePlaceHolder, Allocator>>()("linear search", categories_so_far);
     RegisterLookups<ska::inplace_linear_search_map<KeyPlaceHolder, ValuePlaceHolder, Allocator>>()("smallvector linear search", categories_so_far);

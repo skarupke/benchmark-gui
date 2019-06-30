@@ -259,7 +259,7 @@ namespace move_tests
             x.insert(v.begin(), v.end());
 
 			test::object_count count = test::global_object_count();
-            y = boost::move(x);
+            y = std::move(x);
             if (BOOST_UNORDERED_TEST_MOVING &&
                     allocator_type::is_propagate_on_move)
             {
@@ -295,7 +295,7 @@ namespace move_tests
 			test::object_count count1 = test::global_object_count();
 
             T y(v1.begin(), v1.end(), 0, hf, eq, al1);
-            y = boost::move(x);
+            y = std::move(x);
 			x.clear();
 
 			test::object_count count2 = test::global_object_count();

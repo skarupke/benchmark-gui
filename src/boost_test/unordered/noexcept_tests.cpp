@@ -66,7 +66,7 @@ namespace noexcept_tests
 
         typedef boost::hash<int> base;
     public:
-        hash_nothrow_move(BOOST_RV_REF(hash_nothrow_move))
+        hash_nothrow_move(hash_nothrow_move&&)
             BOOST_NOEXCEPT {}
 
         hash_nothrow_move() { test_throw("Constructor"); }
@@ -83,7 +83,7 @@ namespace noexcept_tests
 
         typedef std::equal_to<int> base;
     public:
-        equal_to_nothrow_move(BOOST_RV_REF(equal_to_nothrow_move))
+        equal_to_nothrow_move(equal_to_nothrow_move&&)
             BOOST_NOEXCEPT {}
         equal_to_nothrow_move() { test_throw("Constructor"); }
 		equal_to_nothrow_move(equal_to_nothrow_move const&)
@@ -111,7 +111,7 @@ namespace noexcept_tests
             try {
                 throwing_test_exception = true;
 
-                throwing_set x2 = boost::move(x1);
+                throwing_set x2 = std::move(x1);
                 BOOST_TEST(x2.size() == 2);
                 BOOST_TEST(*x2.begin() == 10 || *x2.begin() == 50);
             } catch(test_exception) {

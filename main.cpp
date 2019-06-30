@@ -19,10 +19,6 @@
 #include "math/halton_sequence.hpp"
 #include "util/bit_iter.hpp"
 
-// todo: move the end() ptr of flat_hash_map to index -1
-// todo: make the bucket sizes for prime numbers be close to 16
-// todo: make libdivide be the default prime number policy
-
 static constexpr const size_t num_loops = 10000;
 
 thread_local std::mt19937_64 global_randomness(random_seed_seq::get_instance());
@@ -390,6 +386,8 @@ void load_from_db(Database & db)
     }
 }
 
+static constexpr size_t NumBenchmarksToKeep = 64;
+
 void persist_to_db(Database & db)
 {
     SqLiteStatement begin_transaction = db.prepare("BEGIN").first;
@@ -404,7 +402,7 @@ void persist_to_db(Database & db)
         int benchmark_id = AddBenchmark(db, *benchmark.second.categories);
         for (auto & group : benchmark.second.results)
         {
-            if (group.second.size() > 64)
+            if (group.second.size() > NumBenchmarksToKeep)
             {
                 std::sort(group.second.begin(), group.second.end(), [](const skb::RunResults & a, const skb::RunResults & b)
                 {
@@ -415,7 +413,7 @@ void persist_to_db(Database & db)
                     group.second.pop_back();
                     group.second.erase(group.second.begin());
                 }
-                while (group.second.size() > 64);
+                while (group.second.size() > NumBenchmarksToKeep);
             }
             for (const skb::RunResults & result : group.second)
             {
@@ -463,6 +461,7 @@ void write_checkbox_state(BenchmarkMainGui & root, Database & db)
 
 extern void count_num_lookups();
 extern void test_iaca(int to_find);
+extern void RegisterSorting();
 
 #ifndef FUZZER_BUILD
 int main(int argc, char * argv[])
@@ -492,6 +491,7 @@ int main(int argc, char * argv[])
     RegisterHashtableBenchmarks();
     RegisterDivision();
     RegisterBitIterBenchmarks();
+    RegisterSorting();
     load_from_db(permanent_storage);
 
     BenchmarkMainGui root;
@@ -559,37 +559,34 @@ int main(int argc, char * argv[])
         {
             {
                 std::lock_guard<std::mutex> lock(run_first_mutex);
+                while (!run_argument_first.empty() && !can_run(run_argument_first.front().first))
+                    run_argument_first.pop_front();
                 if (!run_argument_first.empty())
                 {
-                    while (!can_run(run_argument_first.front().first))
-                        run_argument_first.pop_front();
-                    if (!run_argument_first.empty())
+                    if (root.ProfileMode())
                     {
-                        if (root.ProfileMode())
+                        while (run_argument_first.size() > 1)
                         {
-                            while (run_argument_first.size() > 1)
-                            {
-                                if (can_run(run_argument_first.back().first))
-                                    run_argument_first.pop_front();
-                                else
-                                    run_argument_first.pop_back();
-                            }
-                            return run_argument_first.front();
+                            if (can_run(run_argument_first.back().first))
+                                run_argument_first.pop_front();
+                            else
+                                run_argument_first.pop_back();
                         }
-                        else
-                        {
-                            std::pair<skb::BenchmarkResults *, int> result = run_argument_first.front();
-                            run_argument_first.pop_front();
-                            return result;
-                        }
+                        return run_argument_first.front();
+                    }
+                    else
+                    {
+                        std::pair<skb::BenchmarkResults *, int> result = run_argument_first.front();
+                        run_argument_first.pop_front();
+                        return result;
                     }
                 }
-                const std::vector<skb::BenchmarkResults *> & visible = root.GetGraph().GetData();
                 if (root.ShouldPreferVisible())
                 {
+                    const std::vector<skb::BenchmarkResults *> & visible = root.GetGraph().GetData();
                     skb::BenchmarkResults * min_result = nullptr;
                     int min_argument = 0;
-                    size_t min_size = 16;
+                    size_t min_size = NumBenchmarksToKeep + 1;
                     int xlimit = root.GetGraph().GetXLimit();
                     for (skb::BenchmarkResults * result : visible)
                     {

@@ -31,7 +31,7 @@ struct MemFn<Result (Class::*)(Arguments...) const>
 template<typename Result, typename Class>
 struct MemFn<Result (Class::*)>
 {
-    Result (Class::*ptr);
+    Result Class::*ptr;
     Result & operator()(Class & object) const
     {
         return object.*ptr;

@@ -455,9 +455,9 @@ void unordered_movable_test(X& x, Key& k, T& /* t */, Hash& hf, Pred& eq)
 
 #if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES)
     X x1(rvalue_default<X>());
-    X x2(boost::move(x1));
+    X x2(std::move(x1));
     x1 = rvalue_default<X>();
-    x2 = boost::move(x1);
+    x2 = std::move(x1);
 #endif
 
     test::minimal::constructor_param* i = 0; 
@@ -481,21 +481,21 @@ void unordered_movable_test(X& x, Key& k, T& /* t */, Hash& hf, Pred& eq)
     test::check_return_type<iterator>::equals(a.emplace_hint(q, v));
 
     T v1(v);
-    a.emplace(boost::move(v1));
+    a.emplace(std::move(v1));
     T v2(v);
-    a.insert(boost::move(v2));
+    a.insert(std::move(v2));
     T v3(v);
     test::check_return_type<iterator>::equals(
-            a.emplace_hint(q, boost::move(v3)));
+            a.emplace_hint(q, std::move(v3)));
     T v4(v);
     test::check_return_type<iterator>::equals(
-            a.insert(q, boost::move(v4)));
+            a.insert(q, std::move(v4)));
 
     a.insert(i, j);
 
     X a10;
     T v5(v);
-    a10.insert(boost::move(v5));
+    a10.insert(std::move(v5));
     q = a10.cbegin();
     test::check_return_type<iterator>::convertible(a10.erase(q));
 

@@ -19,6 +19,7 @@ LINK_LIBS += '-lCsCore1.4'
 LINK_LIBS += '-lsqlite3'
 
 INCLUDE_DIRS += tup.getcwd() .. '/src'
+INCLUDE_DIRS += tup.getcwd() .. '/libs'
 INCLUDE_DIRS += tup.getcwd() .. '/libs/benchmark/include'
 
 SYSTEM_INCLUDE_DIRS += tup.getcwd() .. '/libs/gtest'
@@ -45,6 +46,7 @@ INPUT_FOLDERS += 'src/signals/'
 INPUT_FOLDERS += 'src/test/'
 INPUT_FOLDERS += 'src/util/'
 INPUT_FOLDERS += 'libs/benchmark/src/'
+INPUT_FOLDERS += 'libs/Raduls/'
 
 for v in ivalues(INPUT_FOLDERS) do
 	CPP_SOURCES += glob_cpp(v)

@@ -62,6 +62,38 @@ bool BenchmarkCategories::operator<(const BenchmarkCategories & other) const
     return categories < other.categories;
 }
 
+CategoryBuilder CategoryBuilder::AddCategory(std::string category, std::string value) const &
+{
+    CategoryBuilder result = *this;
+    RAW_VERIFY(result.categories.emplace(std::move(category), std::move(value)).second);
+    return result;
+}
+CategoryBuilder CategoryBuilder::AddCategory(std::string category, std::string value) &&
+{
+    CategoryBuilder result = std::move(*this);
+    RAW_VERIFY(result.categories.emplace(std::move(category), std::move(value)).second);
+    return result;
+}
+
+skb::BenchmarkCategories CategoryBuilder::BuildCategories(std::string type, std::string name) const &
+{
+    skb::BenchmarkCategories result(std::move(type), std::move(name));
+    for (const auto & category : categories)
+    {
+        result.AddCategory(category.first, category.second);
+    }
+    return result;
+}
+skb::BenchmarkCategories CategoryBuilder::BuildCategories(std::string type, std::string name) &&
+{
+    skb::BenchmarkCategories result(std::move(type), std::move(name));
+    for (auto & category : categories)
+    {
+        result.AddCategory(std::move(category.first), std::move(category.second));
+    }
+    return result;
+}
+
 static const std::vector<std::string> & AllCompilers()
 {
     static std::vector<std::string> result = { "gcc", "clang" };

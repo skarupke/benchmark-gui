@@ -42,7 +42,7 @@ namespace insert_stable
     }
 }
 
-UNORDERED_AUTO_TEST(stable_insert_test1) {
+/*UNORDERED_AUTO_TEST(stable_insert_test1) {
     boost::unordered_multiset<insert_stable::member> x;
 
     x.insert(insert_stable::member(1,1));
@@ -58,7 +58,7 @@ UNORDERED_AUTO_TEST(stable_insert_test1) {
     BOOST_TEST(it != end);
     if(it != end) { BOOST_TEST(it->tag2_ == 3); ++it; }
     BOOST_TEST(it == end);
-}
+}*/
 
 UNORDERED_AUTO_TEST(stable_insert_test2) {
     boost::unordered_multimap<insert_stable::member, int> x;

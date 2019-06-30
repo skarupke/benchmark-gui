@@ -19,7 +19,7 @@ TrackAllocations::~TrackAllocations()
     state.SetNumBytes(num_allocated_bytes_after - num_bytes_allocated_before, num_freed_bytes_after - num_bytes_freed_before);
 }
 
-CategoryBuilder add_max_load_factor_category(CategoryBuilder builder, float max_load_factor)
+skb::CategoryBuilder add_max_load_factor_category(skb::CategoryBuilder builder, float max_load_factor)
 {
     if (max_load_factor > 0.0f)
     {

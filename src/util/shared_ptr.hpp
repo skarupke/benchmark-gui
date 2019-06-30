@@ -122,7 +122,7 @@ private:
 	struct ReferenceCount
 	{
 		ReferenceCount()
-			: ref_count(1)
+            : ref_count(0)
 		{
 		}
 
@@ -132,7 +132,7 @@ private:
 		}
 		bool decrement()
 		{
-			if (ref_count.fetch_sub(1, std::memory_order_release) == 1)
+            if (ref_count.fetch_sub(1, std::memory_order_release) == 0)
 			{
 				std::atomic_thread_fence(std::memory_order_acquire);
 				return true;
@@ -142,7 +142,7 @@ private:
         }
         bool unique() const
         {
-            return ref_count == 1;
+            return ref_count == 0;
         }
 	private:
 		std::atomic<int> ref_count;

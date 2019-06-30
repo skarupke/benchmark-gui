@@ -565,29 +565,7 @@ skb::Benchmark * LookupReducedRange(skb::Benchmark * benchmark)
     return benchmark->SetRange(4, upper_limit)->SetRangeMultiplier(1.1);
 }
 
-struct CategoryBuilder
-{
-    CategoryBuilder AddCategory(std::string category, std::string value)
-    {
-        CategoryBuilder result = *this;
-        RAW_VERIFY(result.categories.emplace(std::move(category), std::move(value)).second);
-        return result;
-    }
-
-    skb::BenchmarkCategories BuildCategories(std::string type, std::string name)
-    {
-        skb::BenchmarkCategories result(std::move(type), std::move(name));
-        for (const auto & category : categories)
-        {
-            result.AddCategory(category.first, category.second);
-        }
-        return result;
-    }
-
-    std::map<std::string, std::string> categories;
-};
-
-CategoryBuilder add_max_load_factor_category(CategoryBuilder builder, float max_load_factor);
+skb::CategoryBuilder add_max_load_factor_category(skb::CategoryBuilder builder, float max_load_factor);
 
 template<typename Container>
 struct IsHashMap
@@ -611,7 +589,7 @@ struct MaxSupportedLoadFactor
     static constexpr float value = 1.0f;
 };
 
-inline std::string KeyCategoryString(const CategoryBuilder & categories)
+inline std::string KeyCategoryString(const skb::CategoryBuilder & categories)
 {
     auto found = categories.categories.find("key");
     CHECK_FOR_PROGRAMMER_ERROR(found != categories.categories.end());
@@ -619,10 +597,10 @@ inline std::string KeyCategoryString(const CategoryBuilder & categories)
 }
 
 template<typename T>
-void RegisterLookup(const std::string & name, CategoryBuilder categories)
+void RegisterLookup(const std::string & name, skb::CategoryBuilder categories)
 {
-    CategoryBuilder successful = categories.AddCategory("hashtable type", "lookup").AddCategory("lookup type", "successful");
-    CategoryBuilder unsuccessful = categories.AddCategory("hashtable type", "lookup").AddCategory("lookup type", "unsuccessful");
+    skb::CategoryBuilder successful = categories.AddCategory("hashtable type", "lookup").AddCategory("lookup type", "successful");
+    skb::CategoryBuilder unsuccessful = categories.AddCategory("hashtable type", "lookup").AddCategory("lookup type", "unsuccessful");
     using distribution_type = BenchmarkRandomDistribution<typename T::key_type>;
     std::string key_str = KeyCategoryString(categories);
     for (float max_load_factor : { 0.0f, 0.5f, 0.875f, 0.9375f, 1.0f })
@@ -661,7 +639,7 @@ void RegisterLookup(const std::string & name, CategoryBuilder categories)
         }
         if constexpr (HasNumLookups<T>::value)
         {
-            CategoryBuilder num_lookups_categories = successful.AddCategory("argument type", "predictable random");
+            skb::CategoryBuilder num_lookups_categories = successful.AddCategory("argument type", "predictable random");
             for (std::pair<float, std::string> worst : std::vector<std::pair<float, std::string>>{ { 0.25f, "25" }, { 0.1f, "10" }, { 0.01f, "1" } })
             {
                 benchmark_successful_lookup_predictable_best_worst_n<T> worst_n_lookup(worst.first, false);
@@ -743,15 +721,30 @@ struct ReplaceTemplateArgument<Template<ToReplace, OtherArgs...>, ToReplace, Rep
 {
     using type = Template<Replacement, OtherArgs...>;
 };
+template<template <typename, auto...> typename Template, typename ToReplace, typename Replacement, auto... OtherArgs>
+struct ReplaceTemplateArgument<Template<const ToReplace, OtherArgs...>, ToReplace, Replacement>
+{
+    using type = Template<const Replacement, OtherArgs...>;
+};
 template<template <typename, typename, auto...> typename Template, typename ToReplace, typename Replacement, typename A, auto... OtherArgs>
 struct ReplaceTemplateArgument<Template<A, ToReplace, OtherArgs...>, ToReplace, Replacement>
 {
     using type = Template<typename ReplaceTemplateArgument<A, ToReplace, Replacement>::type, Replacement, OtherArgs...>;
 };
+template<template <typename, typename, auto...> typename Template, typename ToReplace, typename Replacement, typename A, auto... OtherArgs>
+struct ReplaceTemplateArgument<Template<A, const ToReplace, OtherArgs...>, ToReplace, Replacement>
+{
+    using type = Template<typename ReplaceTemplateArgument<A, ToReplace, Replacement>::type, const Replacement, OtherArgs...>;
+};
 template<template <typename, typename, auto...> typename Template, typename ToReplace, typename Replacement, typename B, auto... OtherArgs>
 struct ReplaceTemplateArgument<Template<ToReplace, B, OtherArgs...>, ToReplace, Replacement>
 {
     using type = Template<Replacement, typename ReplaceTemplateArgument<B, ToReplace, Replacement>::type, OtherArgs...>;
+};
+template<template <typename, typename, auto...> typename Template, typename ToReplace, typename Replacement, typename B, auto... OtherArgs>
+struct ReplaceTemplateArgument<Template<const ToReplace, B, OtherArgs...>, ToReplace, Replacement>
+{
+    using type = Template<const Replacement, typename ReplaceTemplateArgument<B, ToReplace, Replacement>::type, OtherArgs...>;
 };
 template<template <typename, typename, typename, auto...> typename Template, typename ToReplace, typename Replacement, typename A, typename C, auto... OtherArgs>
 struct ReplaceTemplateArgument<Template<A, ToReplace, C, OtherArgs...>, ToReplace, Replacement>
@@ -817,7 +810,7 @@ struct ReplaceTemplateArgument<Template<A, ToReplace, C, D, E, F, G, H, I>, ToRe
 template<typename T>
 struct RegisterValueCombinations
 {
-    void operator()(const std::string & name, CategoryBuilder categories_so_far)
+    void operator()(const std::string & name, skb::CategoryBuilder categories_so_far)
     {
         using int_type = typename ReplaceTemplateArgument<T, ValuePlaceHolder, int>::type;
         RegisterLookup<int_type>(name, categories_so_far.AddCategory("value", "int"));
@@ -833,7 +826,7 @@ struct RegisterValueCombinations
 template<typename T>
 struct RegisterLookups
 {
-    void operator()(const std::string & name, CategoryBuilder categories_so_far)
+    void operator()(const std::string & name, skb::CategoryBuilder categories_so_far)
     {
         using int_type = typename ReplaceTemplateArgument<T, KeyPlaceHolder, int>::type;
         RegisterValueCombinations<int_type>()(name, categories_so_far.AddCategory("key", "int"));

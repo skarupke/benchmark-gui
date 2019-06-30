@@ -1,4 +1,7 @@
 #ifdef FUZZER_BUILD
+
+
+#ifdef HASHTABLE_FUZZER
 #include "container/flat_hash_map.hpp"
 #include <map>
 #include <vector>
@@ -250,4 +253,6 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t * data, std::size_t siz
     }
     return 0;
 }
+#endif
+
 #endif

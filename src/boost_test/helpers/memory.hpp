@@ -9,7 +9,6 @@
 #include <memory>
 #include <map>
 #include <boost/assert.hpp>
-#include <boost/unordered/detail/allocate.hpp>
 #include "../helpers/test.hpp"
 
 namespace test

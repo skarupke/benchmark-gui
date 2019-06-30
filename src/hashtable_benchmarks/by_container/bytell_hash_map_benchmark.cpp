@@ -9,11 +9,11 @@ struct HasNumLookups<ska::bytell_hash_map<K, V, H, E, A, L, S>>
 
 void RegisterBytellHashMap()
 {
-    CategoryBuilder categories_so_far;
-    CategoryBuilder prime = categories_so_far.AddCategory("bucket count", "prime number");
-    //CategoryBuilder libdivide = categories_so_far.AddCategory("bucket count", "prime number libdivide");
-    //CategoryBuilder switch_prime = categories_so_far.AddCategory("bucket count", "switch prime number");
-    CategoryBuilder power_of_two = categories_so_far.AddCategory("bucket count", "power of two");
+    skb::CategoryBuilder categories_so_far;
+    skb::CategoryBuilder prime = categories_so_far.AddCategory("bucket count", "prime number");
+    //skb::CategoryBuilder libdivide = categories_so_far.AddCategory("bucket count", "prime number libdivide");
+    //skb::CategoryBuilder switch_prime = categories_so_far.AddCategory("bucket count", "switch prime number");
+    skb::CategoryBuilder power_of_two = categories_so_far.AddCategory("bucket count", "power of two");
     using Allocator = counting_allocator<std::pair<KeyPlaceHolder, ValuePlaceHolder>>;
     RegisterLookups<ska::bytell_hash_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, Allocator>>()("bytell_hash_map", prime);
     RegisterLookups<ska::bytell_hash_map<KeyPlaceHolder, ValuePlaceHolder, power_of_two_hash, std::equal_to<>, Allocator>>()("bytell_hash_map", power_of_two);

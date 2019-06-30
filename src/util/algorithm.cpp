@@ -81,5 +81,106 @@ TEST(partial_sort_pointer, top_seven)
     ASSERT_EQ(7, *sorted[6]);
 }
 
+#include "debug/assert.hpp"
+
+template<size_t UnrollAmount, typename It, typename Func>
+inline void unroll_loop_nonempty2(It begin, size_t iteration_count, Func && to_call)
+{
+    static_assert(UnrollAmount >= 1 && UnrollAmount <= 8, "Currently only support up to 8 loop unrollings");
+    size_t loop_count = (iteration_count + (UnrollAmount - 1)) / UnrollAmount;
+    size_t remainder_count = iteration_count % UnrollAmount;
+    begin += remainder_count;
+    switch(remainder_count)
+    {
+    case 0:
+        do
+        {
+            begin += UnrollAmount;
+            if constexpr (UnrollAmount >= 8)
+                to_call(begin - 8);
+            [[fallthrough]];
+    case 7:
+            if constexpr (UnrollAmount >= 7)
+                to_call(begin - 7);
+            [[fallthrough]];
+    case 6:
+            if constexpr (UnrollAmount >= 6)
+                to_call(begin - 6);
+            [[fallthrough]];
+    case 5:
+            if constexpr (UnrollAmount >= 5)
+                to_call(begin - 5);
+            [[fallthrough]];
+    case 4:
+            if constexpr (UnrollAmount >= 4)
+                to_call(begin - 4);
+            [[fallthrough]];
+    case 3:
+            if constexpr (UnrollAmount >= 3)
+                to_call(begin - 3);
+            [[fallthrough]];
+    case 2:
+            if constexpr (UnrollAmount >= 2)
+                to_call(begin - 2);
+            [[fallthrough]];
+    case 1:
+            to_call(begin - 1);
+            --loop_count;
+        }
+        while(loop_count > 0);
+    }
+}
+
+#include <numeric>
+
+TEST(unroll_loop2, cases)
+{
+    std::vector<int> to_iterate(20);
+    std::iota(to_iterate.begin(), to_iterate.end(), 1);
+    int expected = std::accumulate(to_iterate.begin(), to_iterate.end(), 0);
+    int loop_count = 0;
+    auto loop_body = [&](auto to_add){ loop_count += *to_add; };
+    unroll_loop_nonempty2<1>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    unroll_loop_nonempty2<2>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    unroll_loop_nonempty2<3>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    unroll_loop_nonempty2<4>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    unroll_loop_nonempty2<5>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    unroll_loop_nonempty2<6>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    unroll_loop_nonempty2<7>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+    loop_count = 0;
+    unroll_loop_nonempty2<8>(to_iterate.begin(), to_iterate.size(), loop_body);
+    ASSERT_EQ(loop_count, expected);
+}
+
+/*TEST(int_convert, all_cases)
+{
+    auto add = [](int i)
+    {
+        return static_cast<unsigned int>(i) + static_cast<unsigned int>(1 << (sizeof(int) * 8 - 1));
+    };
+    auto with_xor = [](int i)
+    {
+        return static_cast<unsigned int>(i) ^ static_cast<unsigned int>(1 << (sizeof(int) * 8 - 1));
+    };
+    for (int i = std::numeric_limits<int>::lowest(); i < std::numeric_limits<int>::max(); ++i)
+    {
+        ASSERT_EQ(add(i), with_xor(i));
+    }
+    ASSERT_EQ(add(std::numeric_limits<int>::max()), with_xor(std::numeric_limits<int>::max()));
+}*/
+
 #endif
 
