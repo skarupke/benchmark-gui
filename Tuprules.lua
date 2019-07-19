@@ -74,6 +74,7 @@ CPP_FLAGS += '-fdebug-prefix-map=src/=../src/'
 CPP_FLAGS += '-fdebug-prefix-map=./libs/=../libs/'
 CPP_FLAGS += '-fdebug-prefix-map=libs/=../libs/'
 CPP_FLAGS += '-fdebug-prefix-map=./main=../main'
+CPP_FLAGS += '-fPIE'
 
 CPP_OUTPUT_EXTENSIONS += '.o'
 

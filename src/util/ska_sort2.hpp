@@ -2,10 +2,20 @@
 
 #include "util/radix_sort.hpp"
 #include "debug/assert.hpp"
+#include <list>
 
-
-template<typename T, typename Enable = void>
+template<typename T>
 struct SkaSorter;
+
+template<typename T>
+struct SkaSortContainerAccess;
+template<typename T>
+struct SkaSortContainerCompare;
+
+template<typename It>
+void ska_sort2(It begin, It end);
+template<typename It, typename ExtractKey>
+void ska_sort2(It begin, It end, ExtractKey && extract_key);
 
 namespace detail
 {
@@ -29,14 +39,14 @@ class SkaSortImpl
     void * sort_next_from_callback_data = nullptr;
 
     template<typename ExtractByte>
-    void byte_sort(It begin, It end, std::ptrdiff_t num_elements, ExtractByte & extract_byte)
+    void byte_sort(It begin, std::ptrdiff_t num_elements, ExtractByte & extract_byte)
     {
         if (num_elements < SortSettings::AmericanFlagSortUpperLimit)
         {
             if (num_elements <= std::numeric_limits<uint8_t>::max())
-                american_flag_sort<uint8_t>(begin, end, num_elements, extract_byte);
+                american_flag_sort<uint8_t>(begin, num_elements, extract_byte);
             else
-                american_flag_sort<typename SortSettings::count_type>(begin, end, num_elements, extract_byte);
+                american_flag_sort<typename SortSettings::count_type>(begin, num_elements, extract_byte);
         }
         else
             ska_byte_sort<typename SortSettings::count_type>(begin, num_elements, extract_byte);
@@ -68,7 +78,7 @@ class SkaSortImpl
     }
 
     template<typename count_type, typename ExtractByte>
-    void __attribute__((noinline)) american_flag_sort(It begin, It end, std::ptrdiff_t num_elements, ExtractByte extract_byte)
+    void __attribute__((noinline)) american_flag_sort(It begin, std::ptrdiff_t num_elements, ExtractByte extract_byte)
     {
         count_type counts_and_offsets[256] = {};
         FixedSizeBitSet<256> partitions_used;
@@ -93,53 +103,47 @@ class SkaSortImpl
         if (num_partitions > 1)
         {
             uint8_t * current_block_ptr = remaining_partitions;
-            count_type * current_block = counts_and_offsets + *current_block_ptr;
-            count_type * current_block_end = partition_ends + *current_block_ptr;
-            uint8_t * last_block = remaining_partitions + num_partitions - 1;
+            uint8_t current_block = *current_block_ptr;
+            uint8_t * second_to_last_block = remaining_partitions + num_partitions - 2;
             It it = begin;
-            It block_end = begin + *current_block_end;
-            It last_element = end - 1;
+            It block_end = begin + partition_ends[current_block];
             for (;;)
             {
-                count_type * block = counts_and_offsets + extract_byte(*it);
-                if (block == current_block)
+                for (;;)
                 {
-                    ++it;
-                    if (it == last_element)
+                    uint8_t destination = extract_byte(*it);
+                    count_type destination_index = counts_and_offsets[destination]++;
+                    if (destination == current_block)
                         break;
-                    else if (it == block_end)
+                    auto tmp = std::move(begin[destination_index]);
+                    destination = extract_byte(tmp);
+                    begin[destination_index] = std::move(*it);
+                    destination_index = counts_and_offsets[destination]++;
+                    if (destination == current_block)
                     {
-                        for (;;)
-                        {
-                            ++current_block_ptr;
-                            if (current_block_ptr == last_block)
-                                goto recurse;
-                            current_block = counts_and_offsets + *current_block_ptr;
-                            current_block_end = partition_ends + *current_block_ptr;
-                            if (*current_block != *current_block_end)
-                                break;
-                        }
-
-                        it = begin + *current_block;
-                        block_end = begin + *current_block_end;
+                        begin[destination_index] = std::move(tmp);
+                        break;
                     }
+                    *it = std::move(begin[destination_index]);
+                    begin[destination_index] = std::move(tmp);
                 }
-                else
+                ++it;
+                if (it != block_end)
+                    continue;
+                for (;;)
                 {
-                    auto target_it = begin + (*block)++;
-                    count_type * target_of_target_block = counts_and_offsets + extract_byte(*target_it);
-                    auto tmp = std::move(*it);
-                    if (target_of_target_block == current_block)
+                    if (current_block_ptr == second_to_last_block)
+                        goto recurse;
+                    ++current_block_ptr;
+                    current_block = *current_block_ptr;
+                    count_type current_block_start = counts_and_offsets[current_block];
+                    count_type current_block_end = partition_ends[*current_block_ptr];
+                    if (current_block_start != current_block_end)
                     {
-                        *it = std::move(*target_it);
+                        it = begin + current_block_start;
+                        block_end = begin + current_block_end;
+                        break;
                     }
-                    else
-                    {
-                        It target_of_target_it = begin + (*target_of_target_block)++;
-                        *it = std::move(*target_of_target_it);
-                        *target_of_target_it = std::move(*target_it);
-                    }
-                    *target_it = std::move(tmp);
                 }
             }
         }
@@ -200,13 +204,13 @@ class SkaSortImpl
                 if (begin_offset == end_offset)
                     return false;
 
-                if constexpr (SortSettings::ThreeWaySwap)
+                if constexpr (SortSettings::ThreeWaySwapBoost)
                 {
-                    for (It it = begin + begin_offset, end = begin + end_offset; it != end; ++it)
+                    unroll_loop_nonempty<SortSettings::SecondLoopUnrollAmount>(begin + begin_offset, end_offset - begin_offset, [begin, partition, counts_and_offsets = &*counts_and_offsets, extract_byte](It it)
                     {
                         uint8_t target_partition = extract_byte(*it);
                         count_type offset = counts_and_offsets[target_partition]++;
-                        auto target_it = begin + offset;
+                        It target_it = begin + offset;
                         uint8_t target_of_target_partition = extract_byte(*target_it);
                         auto tmp = std::move(*it);
                         if (target_of_target_partition == partition)
@@ -220,7 +224,23 @@ class SkaSortImpl
                             *target_of_target_it = std::move(*target_it);
                         }
                         *target_it = std::move(tmp);
-                    }
+                    });
+                }
+                else if constexpr (SortSettings::ThreeWaySwapStepanov)
+                {
+                    unroll_loop_nonempty<SortSettings::SecondLoopUnrollAmount>(begin + begin_offset, end_offset - begin_offset, [begin, counts_and_offsets = &*counts_and_offsets, extract_byte](It it)
+                    {
+                        uint8_t destination_partition = extract_byte(*it);
+                        It destination = begin + counts_and_offsets[destination_partition]++;
+                        if (destination == it)
+                            return;
+                        auto tmp = std::move(*destination);
+                        destination_partition = extract_byte(tmp);
+                        *destination = std::move(*it);
+                        destination = begin + counts_and_offsets[destination_partition]++;
+                        *it = std::move(*destination);
+                        *destination = std::move(tmp);
+                    });
                 }
                 else
                 {
@@ -301,7 +321,7 @@ class SkaSortImpl
         using NextKeyType = decltype(next_key_combined(*stored_begin));
         if constexpr (std::is_same_v<unsigned char, NextKeyType>)
         {
-            byte_sort(stored_begin, stored_end, stored_end - stored_begin, next_key_combined);
+            byte_sort(stored_begin, stored_end - stored_begin, next_key_combined);
         }
         else if constexpr (std::is_same_v<bool, NextKeyType>)
         {
@@ -527,6 +547,10 @@ public:
                 break;
         }
     }
+    size_t num_items() const
+    {
+        return stored_end - stored_begin;
+    }
 
     void skip()
     {
@@ -563,6 +587,12 @@ public:
                 }
             });
         }
+    }
+
+    template<typename NewIt, typename ExtractKey, typename Compare>
+    auto change_list_to_sort(NewIt begin, NewIt end, ExtractKey extract_key, Compare compare) const
+    {
+        return SkaSortImpl<SortSettings, false, NewIt, Compare, ExtractKey>{begin, end, compare, extract_key};
     }
 };
 
@@ -615,14 +645,14 @@ struct FloatSorter
 
     struct CompareAsUint
     {
-        static uint32_t as_uint(float f)
+        static uint16_t as_uint(float f)
         {
             union
             {
                 float as_float;
                 uint32_t as_uint;
             } in_union = { f };
-            return in_union.as_uint;
+            return in_union.as_uint & 0x0000'ffff;
         }
         static uint64_t as_uint(double d)
         {
@@ -631,7 +661,7 @@ struct FloatSorter
                 double as_float;
                 uint64_t as_uint;
             } in_union = { d };
-            return in_union.as_uint;
+            return in_union.as_uint & 0x0000'ffff'ffff'ffff;
         }
         bool operator()(float l, float r) const
         {
@@ -694,13 +724,14 @@ struct FloatSorter
     template<typename Sorter>
     static void SortAfterSign(Sorter & sorter)
     {
-        if (SignBit(sorter.first_item()))
+        T first_item = sorter.first_item();
+        if (first_item == 0 || !SignBit(first_item))
         {
-            SortByteBackwards<Size - 2>(sorter);
+            SortByte<Size - 2>(sorter);
         }
         else
         {
-            SortByte<Size - 2>(sorter);
+            SortByteBackwards<Size - 2>(sorter);
         }
     }
 
@@ -723,6 +754,8 @@ struct FloatSorter
     }
     static uint8_t FirstByte(T f)
     {
+        if (f == 0)
+            return 0x80;
         std::uint8_t byte = GetByte<Size - 1>(f);
         std::uint8_t sign_bit = -std::int8_t(byte >> 7);
         return byte ^ (sign_bit | 0x80);
@@ -754,20 +787,346 @@ struct FloatSorter
 };
 
 
+
+struct DefaultContainerAccess
+{
+    /*template<typename T>
+    static decltype(auto) AccessAt(T && container, size_t index)
+    {
+        return container[index];
+    }*/
+    template<typename T>
+    static decltype(auto) AccessAt(T && container, size_t index)
+    {
+        using std::begin;
+        return *std::next(begin(container), index);
+    }
+    template<typename T>
+    static size_t ContainerSize(T && container)
+    {
+        return container.size();
+    }
+};
+
+template<typename T, typename Enable = void>
+struct ContainerAccessDecisionDefaultImpl
+{
+    static constexpr bool UseDefaultImpl = false;
+};
+template<typename T>
+struct ContainerAccessDecisionDefaultImpl<T, std::void_t<decltype(*std::declval<T>().begin())>>
+{
+    static constexpr bool UseDefaultImpl = true;
+};
+template<typename T, typename Enable = void>
+struct ContainerAccessDecisionCustomImpl
+{
+    static constexpr bool UseCustomImpl = false;
+};
+template<typename T>
+struct ContainerAccessDecisionCustomImpl<T, std::void_t<decltype(SkaSortContainerAccess<T>::AccessAt(std::declval<T>(), 0))>>
+{
+    static constexpr bool UseCustomImpl = true;
+};
+
+template<typename T>
+struct ContainerAccessDecision
+{
+    using type = std::conditional_t<ContainerAccessDecisionCustomImpl<T>::UseCustomImpl, SkaSortContainerAccess<T>,
+                 std::conditional_t<ContainerAccessDecisionDefaultImpl<T>::UseDefaultImpl, DefaultContainerAccess,
+                 void>>;
+};
+
+
+template<typename T, typename Enable = void>
+struct FallbackSkaSorter
+{
+    template<typename Sorter>
+    void operator()(Sorter & sorter)
+    {
+        sorter.sort([](auto && v)
+        {
+            return to_radix_sort_key(v);
+        });
+    }
+};
+
+template<typename T>
+struct FallbackSkaSorter<T, std::enable_if_t<!std::is_same_v<typename detail::ContainerAccessDecision<T>::type, void> && std::is_convertible_v<typename std::iterator_traits<decltype(std::declval<T>().begin())>::iterator_category, std::random_access_iterator_tag>>>
+{
+    using ContainerAccess = typename detail::ContainerAccessDecision<T>::type;
+
+    struct ListSortData
+    {
+        size_t current_index = 0;
+        size_t recursion_limit = 16;
+    };
+
+    struct SortAtIndex
+    {
+        size_t index = 0;
+        bool operator()(const T & l, const T & r) const
+        {
+            return SkaSortContainerCompare<T>::LessThanAtIndex(l, r, index);
+        }
+    };
+
+    template<typename Sorter>
+    static size_t CommonPrefix(Sorter & sorter, size_t start_index)
+    {
+        const auto & largest_match_list = sorter.first_item();
+        size_t largest_match = ContainerAccess::ContainerSize(largest_match_list);
+        if (largest_match == start_index)
+            return start_index;
+        bool first = true;
+        sorter.for_each_item([&](const auto & current_list)
+        {
+            if (first)
+            {
+                first = false;
+                return true;
+            }
+            size_t current_size = ContainerAccess::ContainerSize(current_list);
+            if (current_size < largest_match)
+            {
+                largest_match = current_size;
+                if (largest_match == start_index)
+                    return false;
+            }
+            if (ContainerAccess::AccessAt(largest_match_list, start_index) != ContainerAccess::AccessAt(current_list, start_index))
+            {
+                largest_match = start_index;
+                return false;
+            }
+            for (size_t i = start_index + 1; i < largest_match; ++i)
+            {
+                if (ContainerAccess::AccessAt(largest_match_list, i) != ContainerAccess::AccessAt(current_list, i))
+                {
+                    largest_match = i;
+                    break;
+                }
+            }
+            return true;
+        });
+        return largest_match;
+    }
+
+    template<typename Sorter>
+    static void sort(Sorter & sorter, ListSortData sort_data)
+    {
+        sort_data.current_index = CommonPrefix(sorter, sort_data.current_index);
+        sorter.sort([current_index = sort_data.current_index](const auto & list)
+        {
+            return ContainerAccess::ContainerSize(list) > current_index;
+        }, static_cast<void (*)(Sorter &, ListSortData)>([](Sorter & sorter, ListSortData sort_data)
+        {
+            if (ContainerAccess::ContainerSize(sorter.first_item()) <= sort_data.current_index)
+                sorter.skip();
+            else
+            {
+                sorter.sort_with_faster_comparison([current_index = sort_data.current_index](const auto & list) -> decltype(auto)
+                {
+                    return ContainerAccess::AccessAt(list, current_index);
+                }, SortAtIndex{sort_data.current_index}, &sort_from_recursion<Sorter>, sort_data);
+            }
+        }), sort_data);
+    }
+
+    template<typename Sorter>
+    static void sort_from_recursion(Sorter & sorter, ListSortData sort_data)
+    {
+        ++sort_data.current_index;
+        --sort_data.recursion_limit;
+        if (sort_data.recursion_limit == 0)
+        {
+            sorter.std_sort_fallback(SortAtIndex{sort_data.current_index});
+        }
+        else
+        {
+            sort(sorter, sort_data);
+        }
+    }
+
+    template<typename Sorter>
+    void operator()(Sorter & sorter)
+    {
+        sort(sorter, ListSortData());
+    }
+};
+
+template<typename T>
+struct FallbackSkaSorter<T, std::enable_if_t<!std::is_same_v<typename detail::ContainerAccessDecision<T>::type, void> && !std::is_convertible_v<typename std::iterator_traits<decltype(std::declval<T>().begin())>::iterator_category, std::random_access_iterator_tag> && std::is_convertible_v<typename std::iterator_traits<decltype(std::declval<T>().begin())>::iterator_category, std::forward_iterator_tag> > >
+{
+    using ContainerAccess = typename detail::ContainerAccessDecision<T>::type;
+
+    using iterator_type = decltype(std::declval<T>().begin());
+
+    struct SortProxy
+    {
+        SortProxy(T & to_sort, size_t original_index)
+            : it(to_sort.begin())
+            , end(to_sort.end())
+            , original(std::addressof(to_sort))
+            , original_index(original_index)
+        {
+        }
+
+        iterator_type it;
+        iterator_type end;
+        T * original;
+        size_t original_index;
+    };
+
+    struct ListSortData
+    {
+        size_t recursion_limit = 16;
+    };
+
+    struct SortFallback
+    {
+        bool operator()(const SortProxy & l, const SortProxy & r) const
+        {
+            return std::lexicographical_compare(l.it, l.end, r.it, r.end);
+        }
+    };
+
+    template<typename Sorter>
+    static void SkipCommonPrefix(Sorter & sorter)
+    {
+        const SortProxy & largest_match_list = sorter.first_item();
+        if (largest_match_list.it == largest_match_list.end)
+            return;
+        bool first = true;
+        size_t largest_match = std::numeric_limits<size_t>::max();
+        sorter.for_each_item([&](const SortProxy & current_list)
+        {
+            if (first)
+            {
+                first = false;
+                return true;
+            }
+            size_t match_size = 0;
+            for (iterator_type it = current_list.it, end = current_list.end, it2 = largest_match_list.it, it2end = largest_match_list.end; it != end; ++it)
+            {
+                if (*it != *it2)
+                    break;
+                ++match_size;
+                if (match_size == largest_match)
+                    return true;
+                ++it2;
+                if (it2 == it2end)
+                    break;
+            }
+            if (match_size < largest_match)
+            {
+                if (match_size == 0)
+                {
+                    largest_match = 0;
+                    return false;
+                }
+                largest_match = match_size;
+            }
+            return true;
+        });
+        if (largest_match == 0)
+            return;
+        sorter.for_each_item([largest_match](SortProxy & current_list)
+        {
+            for (size_t i = 0; i < largest_match; ++i)
+                ++current_list.it;
+            return true;
+        });
+    }
+
+    template<typename Sorter>
+    static void sort(Sorter & sorter, ListSortData sort_data)
+    {
+        SkipCommonPrefix(sorter);
+        sorter.sort([](const SortProxy & list)
+        {
+            return list.it != list.end;
+        }, static_cast<void (*)(Sorter &, ListSortData)>([](Sorter & sorter, ListSortData sort_data)
+        {
+            const SortProxy & first_item = sorter.first_item();
+            if (first_item.it == first_item.end)
+                sorter.skip();
+            else
+            {
+                sorter.sort([](const SortProxy & proxy){ return *proxy.it; }, &sort_from_recursion<Sorter>, sort_data);
+            }
+        }), sort_data);
+    }
+
+    template<typename Sorter>
+    static void sort_from_recursion(Sorter & sorter, ListSortData sort_data)
+    {
+        sorter.for_each_item([](SortProxy & proxy)
+        {
+            ++proxy.it;
+            return true;
+        });
+        --sort_data.recursion_limit;
+        if (sort_data.recursion_limit == 0)
+        {
+            sorter.std_sort_fallback(SortFallback());
+        }
+        else
+        {
+            sort(sorter, sort_data);
+        }
+    }
+
+    template<typename Sorter>
+    void operator()(Sorter & sorter)
+    {
+        std::vector<SortProxy> sort_this_instead;
+        sort_this_instead.reserve(sorter.num_items());
+        size_t index = 0;
+        sorter.for_each_item([&](T & to_sort)
+        {
+            sort_this_instead.emplace_back(to_sort, index);
+            ++index;
+            return true;
+        });
+        auto new_sorter = sorter.change_list_to_sort(sort_this_instead.begin(), sort_this_instead.end(), IdentityFunctor(), SortFallback());
+        sort(new_sorter, ListSortData());
+        for (size_t i = 0, end = sort_this_instead.size(); i < end; ++i)
+        {
+            size_t original_index = sort_this_instead[i].original_index;
+            if (original_index == i)
+                continue;
+            T tmp = std::move(*sort_this_instead[i].original);
+            size_t target_index = i;
+            do
+            {
+                *sort_this_instead[target_index].original = std::move(*sort_this_instead[original_index].original);
+                target_index = original_index;
+                original_index = std::exchange(sort_this_instead[original_index].original_index, original_index);
+            }
+            while(original_index != i);
+            *sort_this_instead[target_index].original = std::move(tmp);
+        }
+        sorter.skip();
+    }
+};
+
+
 template<typename SortSettings, typename It, typename ExtractKey>
 void ska_sort2_with_settings(It begin, It end, ExtractKey && extract_key)
 {
-    using CallWrapper = CallableWrapper<ExtractKey>;
-    CallWrapper wrapper{std::forward<ExtractKey>(extract_key)};
-    std::ptrdiff_t num_elements = end - begin;
-    if (DefaultSortIfLessThanThreshold<SortSettings>(begin, end, num_elements, [=](auto && l, auto && r){ return wrapper(l) < wrapper(r); }))
-        return;
-    using Sorter = SkaSorter<std::decay_t<decltype(wrapper(*begin))>>;
-    auto fallback_compare = [wrapper](auto && l, auto && r)
+    auto invoke_wrapper = [extract_key](auto && a) -> decltype(auto)
     {
-        return wrapper(l) < wrapper(r);
+        return std::invoke(extract_key, std::forward<decltype(a)>(a));
     };
-    detail::SkaSortImpl<SortSettings, false, It, decltype(fallback_compare), CallWrapper> impl{begin, end, fallback_compare, wrapper};
+    std::ptrdiff_t num_elements = end - begin;
+    auto fallback_compare = [invoke_wrapper](auto && l, auto && r)
+    {
+        return invoke_wrapper(l) < invoke_wrapper(r);
+    };
+    if (DefaultSortIfLessThanThreshold<SortSettings>(begin, end, num_elements, fallback_compare))
+        return;
+    using Sorter = SkaSorter<std::decay_t<decltype(invoke_wrapper(*begin))>>;
+    detail::SkaSortImpl<SortSettings, false, It, decltype(fallback_compare), decltype(invoke_wrapper)> impl{begin, end, fallback_compare, invoke_wrapper};
     Sorter()(impl);
 }
 template<typename SortSettings, typename It>
@@ -835,6 +1194,14 @@ struct SkaSorter<signed char> : detail::ByValueToUnsignedSorter
 {
 };
 template<>
+struct SkaSorter<char16_t> : detail::ByValueToUnsignedSorter
+{
+};
+template<>
+struct SkaSorter<char32_t> : detail::ByValueToUnsignedSorter
+{
+};
+template<>
 struct SkaSorter<signed short> : detail::ByValueToUnsignedSorter
 {
 };
@@ -848,6 +1215,10 @@ struct SkaSorter<signed long> : detail::ByValueToUnsignedSorter
 };
 template<>
 struct SkaSorter<signed long long> : detail::ByValueToUnsignedSorter
+{
+};
+template<typename T>
+struct SkaSorter<T *> : detail::ByValueToUnsignedSorter
 {
 };
 template<>
@@ -986,8 +1357,6 @@ struct SkaSorter<std::variant<Args...>>
     }
 };
 
-template<typename T, typename Enable = void>
-struct SkaSortContainerAccess;
 template<typename T>
 struct SkaSortContainerCompare
 {
@@ -995,16 +1364,7 @@ struct SkaSortContainerCompare
     {
         using std::begin;
         using std::end;
-        return std::lexicographical_compare(begin(l) + index, end(l), begin(r) + index, end(r));
-    }
-};
-
-template<typename T>
-struct SkaSortContainerAccess<T, typename detail::void_t<decltype(std::declval<T>()[0])>::type>
-{
-    static decltype(auto) AccessAt(const T & container, size_t index)
-    {
-        return container[index];
+        return std::lexicographical_compare(std::next(begin(l), index), end(l), std::next(begin(r), index), end(r));
     }
 };
 
@@ -1020,9 +1380,10 @@ struct SkaSortContainerCompare<std::basic_string<C, T, A>>
     {
         size_t l_size = l.size();
         size_t r_size = r.size();
-        int compare_result = T::compare(l.data() + index, r.data() + index, (l_size < r_size ? l_size : r_size) - index);
+        bool l_is_smaller = l_size < r_size;
+        int compare_result = T::compare(l.data() + index, r.data() + index, (l_is_smaller ? l_size : r_size) - index);
         if (compare_result == 0)
-            return l_size < r_size;
+            return l_is_smaller;
         else
             return compare_result < 0;
     }
@@ -1038,120 +1399,26 @@ struct SkaSortContainerCompare<std::basic_string<C, T, A>>
     }*/
 };
 
-template<typename T>
-struct SkaSorter<T, typename std::enable_if<std::is_same_v<std::decay_t<T>, T>, typename detail::void_t<decltype(SkaSortContainerAccess<T>::AccessAt(std::declval<T>(), 0))>::type>::type>
+template<typename C, typename T>
+struct SkaSortContainerCompare<std::basic_string_view<C, T>>
 {
-    using ContainerAccess = SkaSortContainerAccess<T>;
-
-    struct ListSortData
+    using StringType = std::basic_string_view<C, T>;
+    static bool LessThanAtIndex(StringType l, StringType r, size_t index)
     {
-        size_t current_index = 0;
-        size_t recursion_limit = 16;
-    };
-
-    struct SortAtIndex
-    {
-        size_t index = 0;
-        bool operator()(const T & l, const T & r) const
-        {
-            return SkaSortContainerCompare<T>::LessThanAtIndex(l, r, index);
-        }
-    };
-
-    template<typename Sorter>
-    static size_t CommonPrefix(Sorter & sorter, size_t start_index)
-    {
-        const auto & largest_match_list = sorter.first_item();
-        size_t largest_match = largest_match_list.size();
-        if (largest_match == start_index)
-            return start_index;
-        bool first = true;
-        sorter.for_each_item([&](const auto & current_list)
-        {
-            if (first)
-            {
-                first = false;
-                return true;
-            }
-            size_t current_size = current_list.size();
-            if (current_size < largest_match)
-            {
-                largest_match = current_size;
-                if (largest_match == start_index)
-                    return false;
-            }
-            if (ContainerAccess::AccessAt(largest_match_list, start_index) != ContainerAccess::AccessAt(current_list, start_index))
-            {
-                largest_match = start_index;
-                return false;
-            }
-            for (size_t i = start_index + 1; i < largest_match; ++i)
-            {
-                if (ContainerAccess::AccessAt(largest_match_list, i) != ContainerAccess::AccessAt(current_list, i))
-                {
-                    largest_match = i;
-                    break;
-                }
-            }
-            return true;
-        });
-        return largest_match;
-    }
-
-    template<typename Sorter>
-    static void sort(Sorter & sorter, ListSortData sort_data)
-    {
-        sort_data.current_index = CommonPrefix(sorter, sort_data.current_index);
-        sorter.sort([current_index = sort_data.current_index](const auto & list)
-        {
-            return list.size() > current_index;
-        }, static_cast<void (*)(Sorter &, ListSortData)>([](Sorter & sorter, ListSortData sort_data)
-        {
-            if (sorter.first_item().size() <= sort_data.current_index)
-                sorter.skip();
-            else
-            {
-                sorter.sort_with_faster_comparison([current_index = sort_data.current_index](const auto & list) -> decltype(auto)
-                {
-                    return ContainerAccess::AccessAt(list, current_index);
-                }, SortAtIndex{sort_data.current_index + 1}, &sort_from_recursion<Sorter>, sort_data);
-            }
-        }), sort_data);
-    }
-
-    template<typename Sorter>
-    static void sort_from_recursion(Sorter & sorter, ListSortData sort_data)
-    {
-        ++sort_data.current_index;
-        --sort_data.recursion_limit;
-        if (sort_data.recursion_limit == 0)
-        {
-            sorter.std_sort_fallback(SortAtIndex{sort_data.current_index});
-        }
+        size_t l_size = l.size();
+        size_t r_size = r.size();
+        bool l_is_smaller = l_size < r_size;
+        int compare_result = T::compare(l.data() + index, r.data() + index, (l_is_smaller ? l_size : r_size) - index);
+        if (compare_result == 0)
+            return l_is_smaller;
         else
-        {
-            sort(sorter, sort_data);
-        }
-    }
-
-    template<typename Sorter>
-    void operator()(Sorter & sorter)
-    {
-        sort(sorter, ListSortData());
+            return compare_result < 0;
     }
 };
 
-template<typename T, typename Enable>
-struct SkaSorter
+template<typename T>
+struct SkaSorter : detail::FallbackSkaSorter<T>
 {
-    template<typename Sorter>
-    void operator()(Sorter & sorter)
-    {
-        sorter.sort([](auto && v)
-        {
-            return to_radix_sort_key(v);
-        });
-    }
 };
 
 template<typename It, typename ExtractKey>

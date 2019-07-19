@@ -5,6 +5,8 @@
 #include "util/radix_sort.hpp"
 #include <deque>
 #include <optional>
+#include <list>
+#include "util/ska_sort2.hpp"
 
 #define FULL_TESTS_SLOW_COMPILE_TIME
 
@@ -38,36 +40,27 @@ struct NoStdSortFallbackSetting : detail::DefaultSortSettings
     static constexpr std::ptrdiff_t AmericanFlagSortUpperLimit = 1;
 };
 
-template<bool DoThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap>
 struct AmericanFlagSortOnlySetting : detail::DefaultSortSettings
 {
     static constexpr std::ptrdiff_t AmericanFlagSortUpperLimit = std::numeric_limits<std::ptrdiff_t>::max();
-    static constexpr bool ThreeWaySwap = DoThreeWaySwap;
 };
 
-template<bool DoThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap>
-struct AmericanFlagSortOnlySettingTest : NoStdSortFallbackSetting
-{
-    static constexpr std::ptrdiff_t AmericanFlagSortUpperLimit = std::numeric_limits<std::ptrdiff_t>::max();
-    static constexpr bool ThreeWaySwap = DoThreeWaySwap;
-};
-
-template<std::ptrdiff_t InsertionSortSize,
-         std::ptrdiff_t AmericanFlagSortSize = detail::DefaultSortSettings::AmericanFlagSortUpperLimit,
-         bool DoThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap
+template<std::ptrdiff_t InsertionSortSize
+         , std::ptrdiff_t AmericanFlagSortSize = detail::DefaultSortSettings::AmericanFlagSortUpperLimit
+         , bool DoThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwapBoost
          , size_t FirstLoopUnrollAmountParam = detail::DefaultSortSettings::FirstLoopUnrollAmount
          , size_t SecondLoopUnrollAmountParam = detail::DefaultSortSettings::SecondLoopUnrollAmount
-         , bool UseIndexSortInsteadOfInsertionSort = detail::DefaultSortSettings::UseIndexSort
-         , bool UseFasterComparison = detail::DefaultSortSettings::UseFasterCompare>
+         , bool UseFasterComparison = detail::DefaultSortSettings::UseFasterCompare
+         , bool DoThreeWaySwapStepanov = detail::DefaultSortSettings::ThreeWaySwapStepanov>
 struct ConfigurableSettings : detail::DefaultSortSettings
 {
     template<typename>
     static constexpr std::ptrdiff_t InsertionSortUpperLimit = InsertionSortSize;
-    static constexpr bool ThreeWaySwap = DoThreeWaySwap;
+    static constexpr bool ThreeWaySwapBoost = DoThreeWaySwap;
+    static constexpr bool ThreeWaySwapStepanov = DoThreeWaySwapStepanov;
     static constexpr std::ptrdiff_t AmericanFlagSortUpperLimit = AmericanFlagSortSize;
     static constexpr size_t FirstLoopUnrollAmount = FirstLoopUnrollAmountParam;
     static constexpr size_t SecondLoopUnrollAmount = SecondLoopUnrollAmountParam;
-    static constexpr bool UseIndexSort = UseIndexSortInsteadOfInsertionSort;
     static constexpr bool UseFasterCompare = UseFasterComparison;
 };
 
@@ -86,12 +79,7 @@ static void inplace_radix_sort(It begin, It end)
 template<typename It, typename ExtractKey>
 static void american_flag_sort(It begin, It end, ExtractKey && extract_key)
 {
-    detail::inplace_radix_sort<AmericanFlagSortOnlySetting<detail::DefaultSortSettings::ThreeWaySwap>>(begin, end, extract_key);
-}
-template<bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap, typename It, typename ExtractKey>
-static void american_flag_sort_test(It begin, It end, ExtractKey && extract_key)
-{
-    detail::inplace_radix_sort<AmericanFlagSortOnlySettingTest<ThreeWaySwap>>(begin, end, extract_key);
+    detail::inplace_radix_sort<AmericanFlagSortOnlySetting>(begin, end, extract_key);
 }
 
 template<typename It>
@@ -140,25 +128,25 @@ void ska_sort_configurable(It begin, It end)
     ska_sort_configurable<InsertionSortUpperLimit, AmericanFlagSortUpperLimit>(begin, end, detail::IdentityFunctor());
 }
 
-template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap, typename It, typename ExtractKey>
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, bool ThreeWaySwapBoost = detail::DefaultSortSettings::ThreeWaySwapBoost, bool ThreeWaySwapStepanov = detail::DefaultSortSettings::ThreeWaySwapStepanov, typename It, typename ExtractKey>
 void ska_byte_sort_configurable(It begin, It end, ExtractKey && extract_key)
 {
-    detail::inplace_radix_sort<ConfigurableSettings<InsertionSortUpperLimit, 1, ThreeWaySwap>>(begin, end, extract_key);
+    detail::ska_sort2_with_settings<ConfigurableSettings<InsertionSortUpperLimit, 1, ThreeWaySwapBoost, detail::DefaultSortSettings::FirstLoopUnrollAmount, detail::DefaultSortSettings::SecondLoopUnrollAmount, detail::DefaultSortSettings::UseFasterCompare, ThreeWaySwapStepanov>>(begin, end, extract_key);
 }
-template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap, typename It>
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, bool ThreeWaySwapBoost = detail::DefaultSortSettings::ThreeWaySwapBoost, bool ThreeWaySwapStepanov = detail::DefaultSortSettings::ThreeWaySwapStepanov, typename It>
 void ska_byte_sort_configurable(It begin, It end)
 {
-    ska_byte_sort_configurable<InsertionSortUpperLimit, ThreeWaySwap>(begin, end, detail::IdentityFunctor());
+    ska_byte_sort_configurable<InsertionSortUpperLimit, ThreeWaySwapBoost, ThreeWaySwapStepanov>(begin, end, detail::IdentityFunctor());
 }
-template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap, typename It, typename ExtractKey>
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, typename It, typename ExtractKey>
 void american_flag_sort_configurable(It begin, It end, ExtractKey && extract_key)
 {
-    detail::inplace_radix_sort<ConfigurableSettings<InsertionSortUpperLimit, std::numeric_limits<std::ptrdiff_t>::max(), ThreeWaySwap>>(begin, end, extract_key);
+    detail::ska_sort2_with_settings<ConfigurableSettings<InsertionSortUpperLimit, std::numeric_limits<std::ptrdiff_t>::max()>>(begin, end, extract_key);
 }
-template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap, typename It>
+template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>, typename It>
 void american_flag_sort_configurable(It begin, It end)
 {
-    american_flag_sort_configurable<InsertionSortUpperLimit, ThreeWaySwap>(begin, end, detail::IdentityFunctor());
+    american_flag_sort_configurable<InsertionSortUpperLimit>(begin, end, detail::IdentityFunctor());
 }
 
 #ifndef DISABLE_GTEST
@@ -254,7 +242,7 @@ template<typename T, typename Shuffle, typename ExtractKey>
         return ::testing::AssertionFailure() << "inplace_radix_sort failed";
 
     shuffle(container);
-    american_flag_sort_test(container.begin(), container.end(), extract_key);
+    american_flag_sort(container.begin(), container.end(), extract_key);
     if (!is_sorted(container))
         return ::testing::AssertionFailure() << "american_flag_sort failed";
 
@@ -267,6 +255,11 @@ template<typename T, typename Shuffle, typename ExtractKey>
     ska_byte_sort_configurable<1, true>(container.begin(), container.end(), extract_key);
     if (!is_sorted(container))
         return ::testing::AssertionFailure() << "ska_byte_sort with three way swap failed";
+
+    shuffle(container);
+    ska_byte_sort_configurable<1, false, true>(container.begin(), container.end(), extract_key);
+    if (!is_sorted(container))
+        return ::testing::AssertionFailure() << "ska_byte_sort with stepanov three way swap failed";
 
     shuffle(container);
     ska_sort(container.begin(), container.end(), extract_key);
@@ -568,7 +561,8 @@ TEST(sort, move_only)
 
 TEST(sort, vector_bool)
 {
-    std::vector<bool> to_sort = { true, false, true, true, false, true, true, true, false, true, false, false };
+    // todo: turn into std::vector<bool> again
+    std::vector<short> to_sort = { true, false, true, true, false, true, true, true, false, true, false, false };
     ASSERT_TRUE(TestAllSorts(to_sort));
 }
 
@@ -1725,7 +1719,6 @@ TEST(benchmark, inplace_faster)
 #include <custom_benchmark/custom_benchmark.h>
 #include "hashtable_benchmarks/benchmark_shared.hpp"
 #include <boost/sort/sort.hpp>
-#include "util/ska_sort2.hpp"
 
 
 template<size_t Size>
@@ -1798,6 +1791,18 @@ struct SortInput<float>
         return result;
     }
 };
+template<>
+struct SortInput<double>
+{
+    static SKA_NOINLINE(std::vector<double>) sort_input(size_t num_items)
+    {
+        std::normal_distribution<double> distribution(0.0, 1000000.0);
+        std::vector<double> result(num_items);
+        for (double & item : result)
+            item = distribution(global_randomness);
+        return result;
+    }
+};
 extern const std::vector<const char *> & get_word_list();
 extern const std::vector<const char *> & get_kern_log();
 template<>
@@ -1825,6 +1830,24 @@ struct SortInput<std::string>
             {
                 item = kern_log[random_log(global_randomness)];
             }
+        }
+        return result;
+    }
+};
+template<typename T>
+struct SortInput<std::list<T>>
+{
+    static SKA_NOINLINE(std::vector<std::list<T>>) sort_input(size_t num_items)
+    {
+        std::vector<std::string> string_input = SortInput<std::string>::sort_input(num_items);
+        std::vector<std::list<T>> result;
+        result.reserve(string_input.size());
+        for (const std::string & str : string_input)
+        {
+            result.emplace_back();
+            std::list<T> & to_build = result.back();
+            for (char c : str)
+                to_build.emplace_back(c);
         }
         return result;
     }
@@ -1932,61 +1955,64 @@ template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::I
          , std::ptrdiff_t AmericanFlagSortUpperLimit = detail::DefaultSortSettings::AmericanFlagSortUpperLimit
          , size_t FirstLoopUnrollAmount = detail::DefaultSortSettings::FirstLoopUnrollAmount
          , size_t SecondLoopUnrollAmount = detail::DefaultSortSettings::SecondLoopUnrollAmount
-         , bool UseIndexSort = detail::DefaultSortSettings::UseIndexSort
-         , bool UseFasterCompare = detail::DefaultSortSettings::UseFasterCompare, typename It, typename ExtractKey>
+         , bool UseFasterCompare = detail::DefaultSortSettings::UseFasterCompare
+         , bool ThreeWaySwapBoost = detail::DefaultSortSettings::ThreeWaySwapBoost
+         , bool ThreeWaySwapStepanov = detail::DefaultSortSettings::ThreeWaySwapStepanov, typename It, typename ExtractKey>
 void ska_sort2_configurable(It begin, It end, ExtractKey && extract_key)
 {
-    detail::ska_sort2_with_settings<ConfigurableSettings<InsertionSortUpperLimit, AmericanFlagSortUpperLimit, detail::DefaultSortSettings::ThreeWaySwap, FirstLoopUnrollAmount, SecondLoopUnrollAmount, UseIndexSort, UseFasterCompare>>(begin, end, extract_key);
+    detail::ska_sort2_with_settings<ConfigurableSettings<InsertionSortUpperLimit, AmericanFlagSortUpperLimit, ThreeWaySwapBoost, FirstLoopUnrollAmount, SecondLoopUnrollAmount, UseFasterCompare, ThreeWaySwapStepanov>>(begin, end, extract_key);
 }
 template<std::ptrdiff_t InsertionSortUpperLimit = detail::DefaultSortSettings::InsertionSortUpperLimit<int>
          , std::ptrdiff_t AmericanFlagSortUpperLimit = detail::DefaultSortSettings::AmericanFlagSortUpperLimit
          , size_t FirstLoopUnrollAmount = detail::DefaultSortSettings::FirstLoopUnrollAmount
          , size_t SecondLoopUnrollAmount = detail::DefaultSortSettings::SecondLoopUnrollAmount
-         , bool UseIndexSort = detail::DefaultSortSettings::UseIndexSort
-         , bool UseFasterCompare = detail::DefaultSortSettings::UseFasterCompare, typename It>
+         , bool UseFasterCompare = detail::DefaultSortSettings::UseFasterCompare
+         , bool ThreeWaySwapBoost = detail::DefaultSortSettings::ThreeWaySwapBoost
+         , bool ThreeWaySwapStepanov = detail::DefaultSortSettings::ThreeWaySwapStepanov, typename It>
 void ska_sort2_configurable(It begin, It end)
 {
-    ska_sort2_configurable<InsertionSortUpperLimit, AmericanFlagSortUpperLimit, FirstLoopUnrollAmount, SecondLoopUnrollAmount, UseIndexSort, UseFasterCompare>(begin, end, detail::IdentityFunctor());
+    ska_sort2_configurable<InsertionSortUpperLimit, AmericanFlagSortUpperLimit, FirstLoopUnrollAmount, SecondLoopUnrollAmount, UseFasterCompare, ThreeWaySwapBoost, ThreeWaySwapStepanov>(begin, end, detail::IdentityFunctor());
 }
 template<typename T, size_t InsertionSortUpperLimit
                    , std::ptrdiff_t AmericanFlagSortUpperLimit = detail::DefaultSortSettings::AmericanFlagSortUpperLimit
                    , size_t FirstLoopUnrollAmount = detail::DefaultSortSettings::FirstLoopUnrollAmount
                    , size_t SecondLoopUnrollAmount = detail::DefaultSortSettings::SecondLoopUnrollAmount
-                   , bool UseIndexSort = detail::DefaultSortSettings::UseIndexSort
-                   , bool UseFasterCompare = detail::DefaultSortSettings::UseFasterCompare>
+                   , bool UseFasterCompare = detail::DefaultSortSettings::UseFasterCompare
+                   , bool ThreeWaySwapBoost = detail::DefaultSortSettings::ThreeWaySwapBoost
+                   , bool ThreeWaySwapStepanov = detail::DefaultSortSettings::ThreeWaySwapStepanov>
 void benchmark_ska_sort2_configurable(skb::State & state)
 {
     size_t num_items = state.range(0);
     std::vector<T> input = SortInput<T>::sort_input(num_items);
     while (state.KeepRunning())
     {
-        ska_sort2_configurable<InsertionSortUpperLimit, AmericanFlagSortUpperLimit, FirstLoopUnrollAmount, SecondLoopUnrollAmount, UseIndexSort, UseFasterCompare>(input.begin(), input.end());
+        ska_sort2_configurable<InsertionSortUpperLimit, AmericanFlagSortUpperLimit, FirstLoopUnrollAmount, SecondLoopUnrollAmount, UseFasterCompare, ThreeWaySwapBoost, ThreeWaySwapStepanov>(input.begin(), input.end());
         noinline_shuffle(input.begin(), input.end());
     }
     state.SetItemsProcessed(state.iterations() * num_items);
     ska_sort2(input.begin(), input.end());
     CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(input.begin(), input.end()));
 }
-template<typename T, size_t InsertionSortUpperLimit, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap>
+template<typename T, size_t InsertionSortUpperLimit, bool ThreeWaySwapBoost = detail::DefaultSortSettings::ThreeWaySwapBoost, bool ThreeWaySwapStepanov = detail::DefaultSortSettings::ThreeWaySwapStepanov>
 void benchmark_ska_byte_sort_configurable(skb::State & state)
 {
     size_t num_items = state.range(0);
     std::vector<T> input = SortInput<T>::sort_input(num_items);
     while (state.KeepRunning())
     {
-        ska_byte_sort_configurable<InsertionSortUpperLimit, ThreeWaySwap>(input.begin(), input.end());
+        ska_byte_sort_configurable<InsertionSortUpperLimit, ThreeWaySwapBoost, ThreeWaySwapStepanov>(input.begin(), input.end());
         noinline_shuffle(input.begin(), input.end());
     }
     state.SetItemsProcessed(state.iterations() * num_items);
 }
-template<typename T, size_t InsertionSortUpperLimit, bool ThreeWaySwap = detail::DefaultSortSettings::ThreeWaySwap>
+template<typename T, size_t InsertionSortUpperLimit>
 void benchmark_american_flag_sort_configurable(skb::State & state)
 {
     size_t num_items = state.range(0);
     std::vector<T> input = SortInput<T>::sort_input(num_items);
     while (state.KeepRunning())
     {
-        american_flag_sort_configurable<InsertionSortUpperLimit, ThreeWaySwap>(input.begin(), input.end());
+        american_flag_sort_configurable<InsertionSortUpperLimit>(input.begin(), input.end());
         noinline_shuffle(input.begin(), input.end());
     }
     state.SetItemsProcessed(state.iterations() * num_items);
@@ -2126,10 +2152,7 @@ void RegisterSortForTypeAndFallback(skb::CategoryBuilder categories_so_far, cons
     SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_counting_sort_ping_pong_configurable<T, StdSortFallback>, categories_so_far.BuildCategories(benchmark_type, "counting_sort_ping_pong"))->SetBaseline(baseline_name));
     SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort_configurable<T, StdSortFallback>, categories_so_far.BuildCategories(benchmark_type, "ska_sort"))->SetBaseline(baseline_name));
     SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2_configurable<T, StdSortFallback>, categories_so_far.BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
-    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2_configurable<T, StdSortFallback, detail::DefaultSortSettings::AmericanFlagSortUpperLimit, detail::DefaultSortSettings::FirstLoopUnrollAmount, detail::DefaultSortSettings::SecondLoopUnrollAmount, true>, categories_so_far.AddCategory("optimizations", "index_sort").BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
-    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2_configurable<T, StdSortFallback, detail::DefaultSortSettings::AmericanFlagSortUpperLimit, detail::DefaultSortSettings::FirstLoopUnrollAmount, detail::DefaultSortSettings::SecondLoopUnrollAmount, detail::DefaultSortSettings::UseIndexSort, !detail::DefaultSortSettings::UseFasterCompare>, categories_so_far.AddCategory("optimizations", detail::DefaultSortSettings::UseFasterCompare ? "no faster compare" : "faster compare").BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
     SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_byte_sort_configurable<T, StdSortFallback>, categories_so_far.BuildCategories(benchmark_type, "ska_byte_sort"))->SetBaseline(baseline_name));
-    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_byte_sort_configurable<T, StdSortFallback, true>, categories_so_far.AddCategory("optimizations", "three way swap").BuildCategories(benchmark_type, "ska_byte_sort"))->SetBaseline(baseline_name));
     SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_american_flag_sort_configurable<T, StdSortFallback>, categories_so_far.BuildCategories(benchmark_type, "american_flag_sort"))->SetBaseline(baseline_name));
 
     /*RegisterSortForTypeAndUnrollAmount<T, StdSortFallback, 1, 1>(categories_so_far, benchmark_type, baseline_name);
@@ -2157,6 +2180,17 @@ void RegisterSortForTypeAndAmericanFlagSortLimit(skb::CategoryBuilder categories
 }
 
 template<typename T>
+struct IsStdList
+{
+    static constexpr bool value = false;
+};
+template<typename T, typename A>
+struct IsStdList<std::list<T, A>>
+{
+    static constexpr bool value = true;
+};
+
+template<typename T>
 void RegisterSortForType(skb::CategoryBuilder categories_so_far, const std::string & sorted_type, const std::string & baseline_type)
 {
     categories_so_far = categories_so_far.AddCategory("sorted_type", sorted_type);
@@ -2166,13 +2200,15 @@ void RegisterSortForType(skb::CategoryBuilder categories_so_far, const std::stri
 
     SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_std_sort<T>, categories_so_far.BuildCategories(benchmark_type, "std::sort"))->SetBaseline(baseline_name));
     //SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_american_flag_sort<T>, categories_so_far.BuildCategories(benchmark_type, "american_flag_sort"))->SetBaseline(baseline_name));
-    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort<T>, categories_so_far.BuildCategories(benchmark_type, "ska_sort"))->SetBaseline(baseline_name));
+    if constexpr (!IsStdList<T>::value)
+        SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort<T>, categories_so_far.BuildCategories(benchmark_type, "ska_sort"))->SetBaseline(baseline_name));
     SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2<T>, categories_so_far.BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
-    if constexpr (!std::is_same_v<T, std::string>)
+    if constexpr (!std::is_same_v<T, std::string> && !IsStdList<T>::value)
     {
         SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort_ping_pong<T>, categories_so_far.BuildCategories(benchmark_type, "ska_sort_ping_pong"))->SetBaseline(baseline_name));
     }
-    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_counting_sort_ping_pong<T>, categories_so_far.BuildCategories(benchmark_type, "counting_sort_ping_pong"))->SetBaseline(baseline_name));
+    if constexpr (!IsStdList<T>::value)
+        SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_counting_sort_ping_pong<T>, categories_so_far.BuildCategories(benchmark_type, "counting_sort_ping_pong"))->SetBaseline(baseline_name));
 
 
     //auto with_uint32 = &benchmark_counting_sort_ping_pong<T, Uint32SortSettings>;
@@ -2184,9 +2220,17 @@ void RegisterSortForType(skb::CategoryBuilder categories_so_far, const std::stri
     //RegisterSortForTypeAndFallback<T, 1>(categories_so_far, benchmark_type, baseline_name);
     //RegisterSortForTypeAndFallback<T, 4>(categories_so_far, benchmark_type, baseline_name);
     //RegisterSortForTypeAndFallback<T, 8>(categories_so_far, benchmark_type, baseline_name);
-    RegisterSortForTypeAndFallback<T, 16>(categories_so_far, benchmark_type, baseline_name);
-    RegisterSortForTypeAndFallback<T, 24>(categories_so_far, benchmark_type, baseline_name);
-    RegisterSortForTypeAndFallback<T, 32>(categories_so_far, benchmark_type, baseline_name);
+    if constexpr (!IsStdList<T>::value)
+    {
+        RegisterSortForTypeAndFallback<T, 16>(categories_so_far, benchmark_type, baseline_name);
+        RegisterSortForTypeAndFallback<T, 24>(categories_so_far, benchmark_type, baseline_name);
+        RegisterSortForTypeAndFallback<T, 32>(categories_so_far, benchmark_type, baseline_name);
+    }
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2_configurable<T, detail::DefaultSortSettings::InsertionSortUpperLimit<T>, detail::DefaultSortSettings::AmericanFlagSortUpperLimit, detail::DefaultSortSettings::FirstLoopUnrollAmount, detail::DefaultSortSettings::SecondLoopUnrollAmount, !detail::DefaultSortSettings::UseFasterCompare>, categories_so_far.AddCategory("optimizations", detail::DefaultSortSettings::UseFasterCompare ? "no faster compare" : "faster compare").BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2_configurable<T, detail::DefaultSortSettings::InsertionSortUpperLimit<T>, detail::DefaultSortSettings::AmericanFlagSortUpperLimit, detail::DefaultSortSettings::FirstLoopUnrollAmount, detail::DefaultSortSettings::SecondLoopUnrollAmount, detail::DefaultSortSettings::UseFasterCompare, !detail::DefaultSortSettings::ThreeWaySwapBoost>, categories_so_far.AddCategory("optimizations", detail::DefaultSortSettings::ThreeWaySwapBoost ? "no boost three way swap" : "boost three way swap").BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_sort2_configurable<T, detail::DefaultSortSettings::InsertionSortUpperLimit<T>, detail::DefaultSortSettings::AmericanFlagSortUpperLimit, detail::DefaultSortSettings::FirstLoopUnrollAmount, detail::DefaultSortSettings::SecondLoopUnrollAmount, detail::DefaultSortSettings::UseFasterCompare, detail::DefaultSortSettings::ThreeWaySwapBoost, !detail::DefaultSortSettings::ThreeWaySwapStepanov>, categories_so_far.AddCategory("optimizations", detail::DefaultSortSettings::ThreeWaySwapStepanov ? "no stepanov three way swap" : "stepanov three way swap").BuildCategories(benchmark_type, "ska_sort2"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_byte_sort_configurable<T, detail::DefaultSortSettings::InsertionSortUpperLimit<T>, !detail::DefaultSortSettings::ThreeWaySwapBoost>, categories_so_far.AddCategory("optimizations", detail::DefaultSortSettings::ThreeWaySwapBoost ? "no boost three way swap" : "boost three way swap").BuildCategories(benchmark_type, "ska_byte_sort"))->SetBaseline(baseline_name));
+    SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_ska_byte_sort_configurable<T, detail::DefaultSortSettings::InsertionSortUpperLimit<T>, detail::DefaultSortSettings::ThreeWaySwapBoost, !detail::DefaultSortSettings::ThreeWaySwapStepanov>, categories_so_far.AddCategory("optimizations", detail::DefaultSortSettings::ThreeWaySwapStepanov ? "no stepanov three way swap" : "stepanov three way swap").BuildCategories(benchmark_type, "ska_byte_sort"))->SetBaseline(baseline_name));
     //RegisterSortForTypeAndFallback<T, 64>(categories_so_far, benchmark_type, baseline_name);
 
     //RegisterSortForTypeAndAmericanFlagSortLimit<T, 1024>(categories_so_far, benchmark_type, baseline_name);
@@ -2197,7 +2241,8 @@ void RegisterSortForType(skb::CategoryBuilder categories_so_far, const std::stri
 
     if constexpr (!IsIntWithPadding<T>::value)
     {
-        SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_spreadsort<T>, categories_so_far.BuildCategories(benchmark_type, "boost::spreadsort"))->SetBaseline(baseline_name));
+        if constexpr (!IsStdList<T>::value)
+            SortRange<T>(SKA_BENCHMARK_CATEGORIES(&benchmark_spreadsort<T>, categories_so_far.BuildCategories(benchmark_type, "boost::spreadsort"))->SetBaseline(baseline_name));
     }
     else if constexpr (sizeof(T) <= raduls::MAX_REC_SIZE_IN_BYTES)
     {
@@ -2217,12 +2262,14 @@ void RegisterSorting()
     RegisterSortForType<int>(categories_so_far, "int", "int");
     RegisterSortForType<uint8_t>(categories_so_far, "uint8_t", "uint8_t");
     RegisterSortForType<float>(categories_so_far, "float", "float");
+    RegisterSortForType<double>(categories_so_far, "double", "double");
     RegisterSortForType<std::string>(categories_so_far, "string", "string");
+    RegisterSortForType<std::list<int>>(categories_so_far, "std::list", "std::list");
 
     RegisterSortForType<IntWithPadding<8>>(categories_so_far.AddCategory("struct size", "8"), "int", "int_size_8");
-    RegisterSortForType<IntWithPadding<16>>(categories_so_far.AddCategory("struct size", "16"), "int", "int_size_16");
-    RegisterSortForType<IntWithPadding<32>>(categories_so_far.AddCategory("struct size", "32"), "int", "int_size_32");
-    RegisterSortForType<IntWithPadding<64>>(categories_so_far.AddCategory("struct size", "64"), "int", "int_size_64");
+    //RegisterSortForType<IntWithPadding<16>>(categories_so_far.AddCategory("struct size", "16"), "int", "int_size_16");
+    //RegisterSortForType<IntWithPadding<32>>(categories_so_far.AddCategory("struct size", "32"), "int", "int_size_32");
+    //RegisterSortForType<IntWithPadding<64>>(categories_so_far.AddCategory("struct size", "64"), "int", "int_size_64");
 }
 
 #endif

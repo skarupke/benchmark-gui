@@ -1412,7 +1412,8 @@ struct DefaultSortSettings
     template<typename T>
     static constexpr std::ptrdiff_t InsertionSortUpperLimit = InsertionSortUpperLimitForSize(sizeof(T));
     static constexpr std::ptrdiff_t AmericanFlagSortUpperLimit = 2048;
-    static constexpr bool ThreeWaySwap = false;
+    static constexpr bool ThreeWaySwapBoost = false;
+    static constexpr bool ThreeWaySwapStepanov = false;
     static constexpr bool UseIndexSort = false;
     static constexpr bool UseFasterCompare = true;
     static constexpr size_t FirstLoopUnrollAmount = 4;
@@ -1583,7 +1584,7 @@ struct UnsignedInplaceSorter
                 if (begin_offset == end_offset)
                     return false;
 
-                if constexpr (SortSettings::ThreeWaySwap)
+                if constexpr (SortSettings::ThreeWaySwapBoost)
                 {
                     for (It it = begin + begin_offset, end = begin + end_offset; it != end; ++it)
                     {

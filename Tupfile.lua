@@ -13,6 +13,9 @@ LINK_FLAGS += '-L' .. COPPERSPICE_LIB_DIR
 
 LINK_FLAGS += '-Wl,-R'
 LINK_FLAGS += '-Wl,' .. '../' .. COPPERSPICE_LIB_DIR
+LINK_FLAGS += '-fPIE'
+LINK_FLAGS += '-pie'
+LINK_FLAGS += '-Wl,-pie'
 
 LINK_LIBS += '-lCsGui1.4'
 LINK_LIBS += '-lCsCore1.4'
