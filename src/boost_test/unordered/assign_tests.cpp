@@ -36,7 +36,10 @@ void assign_tests1(T*, test::random_generator generator)
         test::check_instances check_;
 
         T x;
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wself-assign-overloaded"
         x = x;
+        #pragma clang diagnostic pop
         BOOST_TEST(x.empty());
         BOOST_TEST(test::equivalent(x.hash_function(), hf));
         BOOST_TEST(test::equivalent(x.key_eq(), eq));
@@ -52,7 +55,10 @@ void assign_tests1(T*, test::random_generator generator)
         test::ordered<T> tracker = test::create_ordered(x);
         tracker.insert_range(v.begin(), v.end());
 
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wself-assign-overloaded"
         x = x;
+        #pragma clang diagnostic pop
         tracker.compare(x);
 
         T y;

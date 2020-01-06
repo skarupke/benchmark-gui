@@ -2,6 +2,7 @@
 
 #include <memory>
 #include "util/view.hpp"
+#include <string_view>
 
 struct sqlite3;
 struct sqlite3_stmt;
@@ -37,7 +38,8 @@ struct SqLiteStatement
     void bind(int index, int value);
     void bind(int index, int64_t value);
     void bind(int index, double value);
-    void bind(int index, StringView<const char> text);
+    //void bind(int index, StringView<const char> text);
+    void bind(int index, std::string_view text);
 
     int GetInt(int index);
     int64_t GetInt64(int index);

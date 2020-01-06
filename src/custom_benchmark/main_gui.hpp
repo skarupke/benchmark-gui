@@ -30,8 +30,8 @@ public:
         return profile_mode.isChecked();
     }
 
-    std::map<std::string, std::map<std::string, bool>> GetCheckboxState() const;
-    void SetCheckboxState(const std::map<std::string, std::map<std::string, bool>> & categories_and_checkboxes);
+    std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> GetCheckboxState() const;
+    void SetCheckboxState(const std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> & categories_and_checkboxes);
 
 private:
     QScrollArea benchmark_checkbox_area;
@@ -47,20 +47,18 @@ private:
 
     BenchmarkGraph graph;
 
-    std::map<std::string, size_t> all_lines;
-
     struct CategoryCheckboxes
     {
-        CategoryCheckboxes(std::string category);
+        CategoryCheckboxes(interned_string category);
 
-        std::string category;
+        interned_string category;
         QWidget parent;
         QGridLayout layout;
-        std::map<std::string, QCheckBox> checkboxes;
+        std::map<interned_string, QCheckBox, interned_string::string_less> checkboxes;
         QCheckBox no_setting_checkbox;
     };
 
-    std::map<std::string, CategoryCheckboxes> category_checkboxes;
+    std::map<interned_string, CategoryCheckboxes, interned_string::string_less> category_checkboxes;
 
     void OnCategoryChanged(int);
 

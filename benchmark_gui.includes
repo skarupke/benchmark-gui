@@ -54,3 +54,6 @@ src/hashtable_benchmarks/by_container
 src/container/hopscotch
 src/container/tessil
 libs/Raduls
+libs/RegionSort
+libs/RegionSort/common
+libs/RegionSort/RadixSort

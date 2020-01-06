@@ -272,7 +272,8 @@ SKA_BENCHMARK("memory access", benchmark_sequential_memory_access)->SetBaseline(
 
 void RunOne(skb::BenchmarkResults & benchmark_data, int argument, bool profile_mode)
 {
-    skb::BenchmarkResults::RunAndBaselineResults result = profile_mode ? benchmark_data.Run(argument, 10.0f) : benchmark_data.RunAndAddResults(argument);
+    skb::BenchmarkResults::RunAndBaselineResults result = benchmark_data.Run(argument, profile_mode ? skb::BenchmarkResults::ProfileMode : skb::BenchmarkResults::SeparateProcess);
+    //skb::BenchmarkResults::RunAndBaselineResults result = profile_mode ? benchmark_data.Run(argument, 10.0f) : benchmark_data.RunAndAddResults(argument);
 
     std::string message = benchmark_data.categories->CategoriesString();
     message += '/';
@@ -332,7 +333,7 @@ int GetBenchmarkId(Database & db, const skb::BenchmarkCategories & categories)
 
 int AddBenchmark(Database & db, const skb::BenchmarkCategories & categories)
 {
-    SqLiteStatement statement = db.prepare("INSERT OR IGNORE INTO benchmarks (categories) VALUES (?1)").first;
+    SqLiteStatement statement = db.prepare("INSERT INTO benchmarks (categories) VALUES (?1)").first;
     statement.bind(1, categories.CategoriesString());
     RAW_VERIFY(!statement.step());
 
@@ -349,6 +350,8 @@ void AddResult(Database & db, int benchmark_id, const skb::RunResults & result)
     statement.bind(6, static_cast<int64_t>(result.num_bytes_used));
     RAW_VERIFY(!statement.step());
 }
+
+static constexpr size_t NumBenchmarksToKeep = 64;
 
 void load_from_db(Database & db)
 {
@@ -377,6 +380,7 @@ void load_from_db(Database & db)
                 static_cast<size_t>(num_bytes_used)
             };
             subgroup.push_back(std::move(result));
+            CHECK_FOR_PROGRAMMER_ERROR(subgroup.size() <= NumBenchmarksToKeep);
         }
         for (auto & subgroup : benchmark.second.results)
         {
@@ -385,8 +389,6 @@ void load_from_db(Database & db)
         statement.reset();
     }
 }
-
-static constexpr size_t NumBenchmarksToKeep = 64;
 
 void persist_to_db(Database & db)
 {
@@ -430,12 +432,12 @@ void read_checkbox_state(BenchmarkMainGui & root, Database & db)
                            "(category TEXT, "
                             "checkbox TEXT, "
                             "checked INTEGER)").first.step());
-    std::map<std::string, std::map<std::string, bool>> state;
+    std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> state;
     SqLiteStatement statement = db.prepare("SELECT category, checkbox, checked FROM checkbox_state").first;
     while (statement.step())
     {
-        const char * category = statement.GetString(0);
-        const char * checkbox = statement.GetString(1);
+        interned_string category(statement.GetString(0));
+        interned_string checkbox(statement.GetString(1));
         int checked = statement.GetInt(2);
         state[category][checkbox] = checked != 0;
     }
@@ -445,7 +447,7 @@ void write_checkbox_state(BenchmarkMainGui & root, Database & db)
 {
     RAW_VERIFY(!db.prepare("DELETE FROM checkbox_state").first.step());
     SqLiteStatement statement = db.prepare("INSERT INTO checkbox_state (category, checkbox, checked) VALUES(?1, ?2, ?3)").first;
-    std::map<std::string, std::map<std::string, bool>> checkbox_state = root.GetCheckboxState();
+    std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> checkbox_state = root.GetCheckboxState();
     for (auto & category : checkbox_state)
     {
         for (auto & checkbox : category.second)
@@ -462,18 +464,29 @@ void write_checkbox_state(BenchmarkMainGui & root, Database & db)
 extern void count_num_lookups();
 extern void test_iaca(int to_find);
 extern void RegisterSorting();
+extern void RegisterMutex();
 
 #ifndef FUZZER_BUILD
 int main(int argc, char * argv[])
 {
+    RegisterHashtableBenchmarks();
+    RegisterDivision();
+    RegisterBitIterBenchmarks();
+    RegisterSorting();
+    RegisterMutex();
+
+    if (skb::RunSingleBenchmarkFromCommandLine(argc, argv))
+        return 0;
+
     ::testing::InitGoogleTest(&argc, argv);
     int result = RUN_ALL_TESTS();
     if (result)
         return result;
 
-#if 0
+#if 1
     ::benchmark::Initialize(&argc, argv);
-    ::benchmark::RunSpecifiedBenchmarks();
+    if (::benchmark::RunSpecifiedBenchmarks())
+        return 0;
 #endif
 
     test_iaca(5);
@@ -488,10 +501,6 @@ int main(int argc, char * argv[])
 
     Database permanent_storage(filename);
 
-    RegisterHashtableBenchmarks();
-    RegisterDivision();
-    RegisterBitIterBenchmarks();
-    RegisterSorting();
     load_from_db(permanent_storage);
 
     BenchmarkMainGui root;
@@ -586,7 +595,7 @@ int main(int argc, char * argv[])
                     const std::vector<skb::BenchmarkResults *> & visible = root.GetGraph().GetData();
                     skb::BenchmarkResults * min_result = nullptr;
                     int min_argument = 0;
-                    size_t min_size = NumBenchmarksToKeep + 1;
+                    size_t min_size = NumBenchmarksToKeep + 12;
                     int xlimit = root.GetGraph().GetXLimit();
                     for (skb::BenchmarkResults * result : visible)
                     {

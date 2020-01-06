@@ -199,6 +199,12 @@ TEST(ska_sort2, string_unicode)
     ASSERT_TRUE(TestAllSkaSort2Combinations(to_sort));
 }
 
+TEST(ska_sort2, char_unicode)
+{
+    std::string to_sort = "Hello, World! précis";
+    ASSERT_TRUE(TestAllSkaSort2Combinations(to_sort));
+}
+
 TEST(ska_sort2, string_unicode_direct_compare)
 {
     auto comparer = SkaSorter<std::string>::SortAtIndex{1};

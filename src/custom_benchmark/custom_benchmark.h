@@ -10,16 +10,30 @@
 #include <mutex>
 #include <signals/connection.hpp>
 #include "benchmark/benchmark.h"
+#include "custom_benchmark/interned_string.hpp"
+#include "container/flat_hash_map.hpp"
 
 namespace skb
 {
 
 extern int global_counter;
+extern float global_float;
+extern double global_double;
 
 template<typename IntType>
 inline void DoNotOptimize(IntType && i)
 {
     global_counter ^= i;
+}
+inline void DoNotOptimize(float f)
+{
+    global_float += f;
+    global_float *= 0.5f;
+}
+inline void DoNotOptimize(double d)
+{
+    global_double += d;
+    global_double *= 0.5;
 }
 inline void DoNotOptimize(const std::string & str)
 {
@@ -171,50 +185,60 @@ struct BenchmarkResults
         std::unique_ptr<RunResults> baseline_results;
     };
 
+    enum RunType
+    {
+        SeparateProcess,
+        ProfileMode
+    };
+
+    RunAndBaselineResults Run(int argument, RunType run_type);
     RunAndBaselineResults Run(int argument, float run_time = default_run_time);
     RunAndBaselineResults RunAndAddResults(int argument, float run_time = default_run_time);
+    RunResults RunInNewProcess(int num_iterations, int argument);
 
     sig2::Signal<BenchmarkResults *> results_added_signal;
 
     mutable std::mutex results_mutex;
     std::map<int, std::vector<RunResults>> results;
+
+    int my_global_index = -1;
 };
 
 struct BenchmarkCategories
 {
-    BenchmarkCategories(std::string type, std::string name);
+    BenchmarkCategories(interned_string type, interned_string name);
 
-    void AddCategory(std::string category, std::string value);
+    void AddCategory(interned_string category, interned_string value);
 
     bool operator<(const BenchmarkCategories & other) const;
 
-    const std::string & GetName() const;
-    const std::string & GetType() const;
-    const std::string & GetCompiler() const;
-    const std::map<std::string, std::string> & GetCategories() const
+    const interned_string & GetName() const;
+    const interned_string & GetType() const;
+    const interned_string & GetCompiler() const;
+    const ska::flat_hash_map<interned_string, interned_string> & GetCategories() const
     {
         return categories;
     }
 
-    static const std::string & TypeIndex();
-    static const std::string & NameIndex();
-    static const std::string & CompilerIndex();
+    static const interned_string & TypeIndex();
+    static const interned_string & NameIndex();
+    static const interned_string & CompilerIndex();
 
     std::string CategoriesString() const;
 
 private:
-    std::map<std::string, std::string> categories;
+    ska::flat_hash_map<interned_string, interned_string> categories;
 };
 
 struct CategoryBuilder
 {
-    CategoryBuilder AddCategory(std::string category, std::string value) const &;
-    CategoryBuilder AddCategory(std::string category, std::string value) &&;
+    CategoryBuilder AddCategory(interned_string category, interned_string value) const &;
+    CategoryBuilder AddCategory(interned_string category, interned_string value) &&;
 
-    skb::BenchmarkCategories BuildCategories(std::string type, std::string name) const &;
-    skb::BenchmarkCategories BuildCategories(std::string type, std::string name) &&;
+    skb::BenchmarkCategories BuildCategories(interned_string type, interned_string name) const &;
+    skb::BenchmarkCategories BuildCategories(interned_string type, interned_string name) &&;
 
-    std::map<std::string, std::string> categories;
+    ska::flat_hash_map<interned_string, interned_string> categories;
 };
 
 struct Benchmark
@@ -226,9 +250,9 @@ struct Benchmark
     int FindGoodNumberOfIterations(int argument, float desired_running_time) const;
 
     static std::map<BenchmarkCategories, BenchmarkResults> & AllBenchmarks();
-    static std::map<std::string, std::map<std::string, std::set<BenchmarkResults *>>> & AllCategories();
+    static ska::flat_hash_map<interned_string, ska::flat_hash_map<interned_string, ska::flat_hash_set<BenchmarkResults *>>> & AllCategories();
 
-    Benchmark * SetBaseline(std::string name_of_baseline_benchmark);
+    Benchmark * SetBaseline(interned_string name_of_baseline_benchmark);
 
     Benchmark * SetRange(int range_begin, int range_end)
     {
@@ -246,7 +270,7 @@ struct Benchmark
     std::vector<int> GetAllArguments() const;
 
 private:
-    std::string baseline;
+    interned_string baseline;
 
     int range_begin = 0;
     int range_end = 0;
@@ -266,6 +290,8 @@ struct LambdaBenchmark : Benchmark
 
     std::function<void (State & state)> function;
 };
+
+bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[]);
 }
 
 #define SKB_CONCAT2(a, b) a ## b

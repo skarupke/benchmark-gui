@@ -3,7 +3,7 @@ COPPERSPICE_DIRECTORY = tup.getcwd() .. '/libs/copperspice-1.4.4/'
 COPPERSPICE_LIB_DIR = COPPERSPICE_DIRECTORY .. 'lib'
 
 LINK_FLAGS += '-pthread'
-LINK_FLAGS += '-fuse-ld=gold'
+--LINK_FLAGS += '-fuse-ld=gold'
 -- the next two lines are for incremental linking.
 -- they are turned off because they seem to be slower
 -- right now. maybe use it when the project gets bigger
@@ -20,12 +20,16 @@ LINK_FLAGS += '-Wl,-pie'
 LINK_LIBS += '-lCsGui1.4'
 LINK_LIBS += '-lCsCore1.4'
 LINK_LIBS += '-lsqlite3'
+LINK_LIBS += '-lboost_system'
+LINK_LIBS += '-lboost_thread'
+LINK_LIBS += '-lstdc++fs'
 
 INCLUDE_DIRS += tup.getcwd() .. '/src'
 INCLUDE_DIRS += tup.getcwd() .. '/libs'
 INCLUDE_DIRS += tup.getcwd() .. '/libs/benchmark/include'
 
 SYSTEM_INCLUDE_DIRS += tup.getcwd() .. '/libs/gtest'
+SYSTEM_INCLUDE_DIRS += tup.getcwd() .. '/libs/RegionSort'
 SYSTEM_INCLUDE_DIRS += COPPERSPICE_DIRECTORY .. 'include'
 SYSTEM_INCLUDE_DIRS += COPPERSPICE_DIRECTORY .. 'include/QtCore'
 SYSTEM_INCLUDE_DIRS += COPPERSPICE_DIRECTORY .. 'include/QtGui'

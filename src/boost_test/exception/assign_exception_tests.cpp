@@ -23,7 +23,10 @@ struct self_assign_base : public test::exception_base
     T init() const { return T(values.begin(), values.end()); }
 	void run(T& x) const
 	{
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wself-assign-overloaded"
 		x = x;
+        #pragma clang diagnostic pop
 	}
     void check BOOST_PREVENT_MACRO_SUBSTITUTION(T const& x) const
         { test::check_equivalent_keys(x); }

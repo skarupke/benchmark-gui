@@ -20,7 +20,10 @@ TEST(type_erasure, copyable)
     a = 3.3f;
     ASSERT_EQ(custom_typeid<float>(), a.target_type());
     ASSERT_EQ(3.3f, *a.target<float>());
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wself-assign-overloaded"
     a = a;
+    #pragma clang diagnostic pop
     ASSERT_EQ(custom_typeid<float>(), a.target_type());
     ASSERT_EQ(3.3f, *a.target<float>());
     const BaseTypeErasure<8, CopyVTable> b = a;

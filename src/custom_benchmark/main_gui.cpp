@@ -3,20 +3,24 @@
 #include "QLabel"
 #include <QMessageBox>
 
-BenchmarkMainGui::CategoryCheckboxes::CategoryCheckboxes(std::string tmp_category)
+BenchmarkMainGui::CategoryCheckboxes::CategoryCheckboxes(interned_string tmp_category)
     : category(std::move(tmp_category)), no_setting_checkbox("None")
 {
     parent.setLayout(&layout);
-    QLabel * name_label = new QLabel(QString::fromUtf8(category.c_str(), this->category.size()));
+    QLabel * name_label = new QLabel(QString::fromUtf8(category.data(), category.size()));
     layout.addWidget(name_label, 0, 0, Qt::AlignHCenter | Qt::AlignTop);
     for (const auto & setting : skb::Benchmark::AllCategories()[category])
     {
-        auto added = checkboxes.emplace(setting.first, QString::fromUtf8(setting.first.c_str(), setting.first.size()));
-        QCheckBox & checkbox = added.first->second;
-        checkbox.setChecked(true);
-        layout.addWidget(&checkbox, checkboxes.size(), 0, Qt::AlignLeft | Qt::AlignTop);
+        checkboxes.emplace(setting.first, QString::fromUtf8(setting.first.data(), setting.first.size()));
     }
-    if (this->category != skb::BenchmarkCategories::NameIndex() && this->category != skb::BenchmarkCategories::TypeIndex())
+    size_t layout_index = 0;
+    for (auto & added : checkboxes)
+    {
+        QCheckBox & checkbox = added.second;
+        checkbox.setChecked(true);
+        layout.addWidget(&checkbox, ++layout_index, 0, Qt::AlignLeft | Qt::AlignTop);
+    }
+    if (category != skb::BenchmarkCategories::NameIndex() && category != skb::BenchmarkCategories::TypeIndex())
     {
         layout.addWidget(&no_setting_checkbox, checkboxes.size() + 1, 0, Qt::AlignHCenter | Qt::AlignTop);
         no_setting_checkbox.setChecked(true);
@@ -37,15 +41,19 @@ BenchmarkMainGui::BenchmarkMainGui()
 
     for (const auto & category : skb::Benchmark::AllCategories())
     {
-        auto added = category_checkboxes.emplace(category.first, category.first);
-        CategoryCheckboxes & checkboxes = added.first->second;
-        if (category.first == skb::BenchmarkCategories::NameIndex())
+        category_checkboxes.emplace(category.first, category.first);
+    }
+    size_t layout_index = 0;
+    for (auto & added : category_checkboxes)
+    {
+        CategoryCheckboxes & checkboxes = added.second;
+        if (added.first == skb::BenchmarkCategories::NameIndex())
         {
             benchmark_checkbox_area.setWidget(&checkboxes.parent);
             checkboxes.parent.setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
         }
         else
-            checkboxes_layout->addWidget(&checkboxes.parent, 0, category_checkboxes.size(), Qt::AlignTop | Qt::AlignLeft);
+            checkboxes_layout->addWidget(&checkboxes.parent, 0, ++layout_index, Qt::AlignTop | Qt::AlignLeft);
         QObject::connect(&checkboxes.no_setting_checkbox, &QCheckBox::stateChanged, this, &BenchmarkMainGui::OnCategoryChanged);
         for (auto & checkbox : checkboxes.checkboxes)
         {
@@ -131,14 +139,14 @@ void BenchmarkMainGui::OnCategoryChanged(int)
     }
 }
 
-static const std::string special_no_setting_checkbox_string = "__special_no_setting_checkbox_is_disabled__";
+static const interned_string special_no_setting_checkbox_string = "__special_no_setting_checkbox_is_disabled__";
 
-std::map<std::string, std::map<std::string, bool>> BenchmarkMainGui::GetCheckboxState() const
+std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> BenchmarkMainGui::GetCheckboxState() const
 {
-    std::map<std::string, std::map<std::string, bool>> result;
+    std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> result;
     for (auto & category : category_checkboxes)
     {
-        std::map<std::string, bool> & to_insert = result[category.first];
+        std::map<interned_string, bool, interned_string::pointer_less> & to_insert = result[category.first];
         to_insert[special_no_setting_checkbox_string] = category.second.no_setting_checkbox.isChecked();
         for (auto & checkbox : category.second.checkboxes)
         {
@@ -147,9 +155,9 @@ std::map<std::string, std::map<std::string, bool>> BenchmarkMainGui::GetCheckbox
     }
     return result;
 }
-void BenchmarkMainGui::SetCheckboxState(const std::map<std::string, std::map<std::string, bool>> & categories_and_checkboxes)
+void BenchmarkMainGui::SetCheckboxState(const std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> & categories_and_checkboxes)
 {
-    std::map<std::string, std::map<std::string, bool>> old_state = GetCheckboxState();
+    std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> old_state = GetCheckboxState();
     bool state_is_compatible = std::equal(categories_and_checkboxes.begin(), categories_and_checkboxes.end(), old_state.begin(), old_state.end(), [](const auto & a, const auto & b)
     {
         return a.first == b.first &&
@@ -163,7 +171,7 @@ void BenchmarkMainGui::SetCheckboxState(const std::map<std::string, std::map<std
 
     for (auto & category : category_checkboxes)
     {
-        const std::map<std::string, bool> & state = categories_and_checkboxes.at(category.first);
+        const std::map<interned_string, bool, interned_string::pointer_less> & state = categories_and_checkboxes.at(category.first);
         category.second.no_setting_checkbox.setChecked(state.at(special_no_setting_checkbox_string));
         for (auto & checkbox : category.second.checkboxes)
         {
@@ -176,7 +184,7 @@ void BenchmarkMainGui::SetCheckboxState(const std::map<std::string, std::map<std
 template<typename Func>
 void BenchmarkMainGui::ForEachNecessaryCheckbox(const skb::BenchmarkCategories & categories, Func && callback)
 {
-    const std::map<std::string, std::string> & categories_map = categories.GetCategories();
+    const auto & categories_map = categories.GetCategories();
     for (auto & category : categories_map)
     {
         QCheckBox * checkbox = &category_checkboxes.at(category.first).checkboxes.at(category.second);

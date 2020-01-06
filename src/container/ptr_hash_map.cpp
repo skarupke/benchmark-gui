@@ -530,7 +530,10 @@ TYPED_TEST_P(sherwood_test_v4, stateful_hasher_test)
 {
     typedef typename TypeParam::template map<int, int, stateful_hasher> map_type;
     map_type a{ { 1, 2 }, { 3, 4 }, { 5, 7 }, { 8, 9 } };
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wself-assign-overloaded"
     a = a;
+    #pragma clang diagnostic pop
     ASSERT_EQ((map_type{ { 1, 2 }, { 3, 4 }, { 5, 7 }, { 8, 9 } }), a);
 }
 

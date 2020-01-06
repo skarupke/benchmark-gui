@@ -1,6 +1,8 @@
 #include "custom_benchmark/custom_benchmark.h"
 #include "hashtable_benchmarks/benchmark_shared.hpp"
 #include <x86intrin.h> // for _bit_scan_forward
+#include <cstring>
+#include "math/powers_of_two.hpp"
 
 struct BitIterStartAtZero
 {
@@ -149,11 +151,123 @@ void bit_iter_random_baseline(skb::State & state)
 }
 SKA_BENCHMARK("baseline", bit_iter_random_baseline);
 
+template<typename T, typename Compare>
+void BenchmarkComparison(skb::State & state, Compare compare)
+{
+    int range = state.range(0);
+    std::normal_distribution<T> distribution(0, range);
+    std::vector<T> input;
+    input.reserve(range);
+    for (int i = 0; i < range; ++i)
+    {
+        input.push_back(distribution(global_randomness));
+    }
+    std::sort(input.begin(), input.end(), compare);
+    while (state.KeepRunning())
+    {
+        std::make_heap(input.begin(), input.end(), compare);
+        std::sort_heap(input.begin(), input.end(), compare);
+    }
+    state.SetItemsProcessed(range * state.iterations() * log2(static_cast<size_t>(range)));
+}
+
+void benchmark_double_comparison(skb::State & state)
+{
+    BenchmarkComparison<double>(state, [](double a, double b)
+    {
+        bool result = a < b;
+        skb::DoNotOptimize(result);
+        return result;
+    });
+}
+void benchmark_double_comparison_48(skb::State & state)
+{
+    BenchmarkComparison<double>(state, [](double a, double b)
+    {
+        uint64_t a_uint;
+        uint64_t b_uint;
+        memcpy(&a_uint, &a, sizeof(a_uint));
+        memcpy(&b_uint, &b, sizeof(b_uint));
+        bool result = (a_uint & 0x0000'ffff'ffff'ffff) < (b_uint & 0x0000'ffff'ffff'ffff);
+        skb::DoNotOptimize(result);
+        return result;
+    });
+}
+void benchmark_double_comparison_64(skb::State & state)
+{
+    BenchmarkComparison<double>(state, [](double a, double b)
+    {
+        uint64_t a_uint;
+        uint64_t b_uint;
+        memcpy(&a_uint, &a, sizeof(a_uint));
+        memcpy(&b_uint, &b, sizeof(b_uint));
+        bool result = a_uint < b_uint;
+        skb::DoNotOptimize(result);
+        return result;
+    });
+}
+void benchmark_double_comparison_baseline(skb::State & state)
+{
+    BenchmarkComparison<double>(state, [](double a, double b)
+    {
+        bool result = a < b;
+        skb::DoNotOptimize(result);
+        return result;
+    });
+}
+SKA_BENCHMARK("baseline", benchmark_double_comparison_baseline);
+
+void benchmark_float_comparison(skb::State & state)
+{
+    BenchmarkComparison<float>(state, [](float a, float b)
+    {
+        bool result = a < b;
+        skb::DoNotOptimize(result);
+        return result;
+    });
+}
+void benchmark_float_comparison_16(skb::State & state)
+{
+    BenchmarkComparison<float>(state, [](float a, float b)
+    {
+        uint16_t a_uint;
+        uint16_t b_uint;
+        memcpy(&a_uint, &a, sizeof(a_uint));
+        memcpy(&b_uint, &b, sizeof(b_uint));
+        bool result = a_uint < b_uint;
+        skb::DoNotOptimize(result);
+        return result;
+    });
+}
+void benchmark_float_comparison_32(skb::State & state)
+{
+    BenchmarkComparison<float>(state, [](float a, float b)
+    {
+        uint32_t a_uint;
+        uint32_t b_uint;
+        memcpy(&a_uint, &a, sizeof(a_uint));
+        memcpy(&b_uint, &b, sizeof(b_uint));
+        bool result = a_uint < b_uint;
+        skb::DoNotOptimize(result);
+        return result;
+    });
+}
+void benchmark_float_comparison_baseline(skb::State & state)
+{
+    BenchmarkComparison<float>(state, [](float a, float b)
+    {
+        bool result = a < b;
+        skb::DoNotOptimize(result);
+        return result;
+    });
+}
+SKA_BENCHMARK("baseline", benchmark_float_comparison_baseline);
+
 static int bit_iter_range_min = 4;
 static int bit_iter_range_max = std::numeric_limits<int>::max();
 static double bit_iter_range_multiplier = 2.0f;
 template<typename T>
-void RegisterBitIterBenchmarks(std::string name)
+void RegisterBitIterBenchmarks(interned_string name)
 {
     skb::BenchmarkCategories categories("instructions", name);
     categories.AddCategory("instruction", "bit_iter");
@@ -170,6 +284,32 @@ void RegisterBitIterBenchmarks(std::string name)
     SKA_BENCHMARK_CATEGORIES(second, second_categories)->SetBaseline("bit_iter_random_baseline")->SetRange(bit_iter_range_min, bit_iter_range_max)->SetRangeMultiplier(bit_iter_range_multiplier);
 }
 
+void RegisterDoubleComparison()
+{
+    static constexpr int double_comparison_min = 4;
+    static constexpr int double_comparison_max = 1024 * 1024;
+    static constexpr double double_comparison_multiplier = 4.0f;
+    skb::BenchmarkCategories double_comparison("instructions", "double_comparison");
+    skb::BenchmarkCategories double_comparison_48("instructions", "double_comparison_48");
+    skb::BenchmarkCategories double_comparison_64("instructions", "double_comparison_64");
+    double_comparison.AddCategory("instruction", "float_comparison");
+    double_comparison_48.AddCategory("instruction", "float_comparison");
+    double_comparison_64.AddCategory("instruction", "float_comparison");
+    SKA_BENCHMARK_CATEGORIES(&benchmark_double_comparison, double_comparison)->SetBaseline("benchmark_double_comparison_baseline")->SetRange(double_comparison_min, double_comparison_max)->SetRangeMultiplier(double_comparison_multiplier);
+    SKA_BENCHMARK_CATEGORIES(&benchmark_double_comparison_48, double_comparison_48)->SetBaseline("benchmark_double_comparison_baseline")->SetRange(double_comparison_min, double_comparison_max)->SetRangeMultiplier(double_comparison_multiplier);
+    SKA_BENCHMARK_CATEGORIES(&benchmark_double_comparison_64, double_comparison_64)->SetBaseline("benchmark_double_comparison_baseline")->SetRange(double_comparison_min, double_comparison_max)->SetRangeMultiplier(double_comparison_multiplier);
+    skb::BenchmarkCategories float_comparison("instructions", "float_comparison");
+    skb::BenchmarkCategories float_comparison_16("instructions", "float_comparison_16");
+    skb::BenchmarkCategories float_comparison_32("instructions", "float_comparison_32");
+    float_comparison.AddCategory("instruction", "float_comparison");
+    float_comparison_16.AddCategory("instruction", "float_comparison");
+    float_comparison_32.AddCategory("instruction", "float_comparison");
+    SKA_BENCHMARK_CATEGORIES(&benchmark_float_comparison, float_comparison)->SetBaseline("benchmark_float_comparison_baseline")->SetRange(double_comparison_min, double_comparison_max)->SetRangeMultiplier(double_comparison_multiplier);
+    SKA_BENCHMARK_CATEGORIES(&benchmark_float_comparison_16, float_comparison_16)->SetBaseline("benchmark_float_comparison_baseline")->SetRange(double_comparison_min, double_comparison_max)->SetRangeMultiplier(double_comparison_multiplier);
+    SKA_BENCHMARK_CATEGORIES(&benchmark_float_comparison_32, float_comparison_32)->SetBaseline("benchmark_float_comparison_baseline")->SetRange(double_comparison_min, double_comparison_max)->SetRangeMultiplier(double_comparison_multiplier);
+}
+
+void RegisterControlledRandom();
 void RegisterBitIterBenchmarks()
 {
     RegisterBitIterBenchmarks<BitIterPlusOne>("plus_one");
@@ -179,6 +319,9 @@ void RegisterBitIterBenchmarks()
     skb::BenchmarkCategories bit_scan_forward("instructions", "bit_scan_forward");
     bit_scan_forward.AddCategory("instruction", "bit_iter");
     SKA_BENCHMARK_CATEGORIES(&benchmark_bit_scan_forward, bit_scan_forward)->SetBaseline("bit_iter_random_baseline")->SetRange(bit_iter_range_min, bit_iter_range_max)->SetRangeMultiplier(bit_iter_range_multiplier);
+
+    RegisterDoubleComparison();
+    RegisterControlledRandom();
 }
 
 #ifndef DISABLE_GTEST

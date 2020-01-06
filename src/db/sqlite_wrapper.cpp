@@ -91,7 +91,15 @@ void SqLiteStatement::bind(int index, double value)
     }
 }
 
-void SqLiteStatement::bind(int index, StringView<const char> text)
+/*void SqLiteStatement::bind(int index, StringView<const char> text)
+{
+    int result = sqlite3_bind_text(statement.get(), index, text.data(), text.size(), SQLITE_TRANSIENT);
+    if (result != SQLITE_OK)
+    {
+        UNHANDLED_ERROR("TODO: handle error of sqlite_bind");
+    }
+}*/
+void SqLiteStatement::bind(int index, std::string_view text)
 {
     int result = sqlite3_bind_text(statement.get(), index, text.data(), text.size(), SQLITE_TRANSIENT);
     if (result != SQLITE_OK)

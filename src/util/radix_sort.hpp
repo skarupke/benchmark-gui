@@ -64,7 +64,13 @@ inline unsigned char to_unsigned_or_bool(signed char c)
 }
 inline unsigned char to_unsigned_or_bool(char c)
 {
-    return static_cast<unsigned char>(c);
+    if constexpr (std::is_signed_v<char>)
+    {
+        constexpr unsigned char sign_bit = 128;
+        return static_cast<unsigned char>(c) ^ sign_bit;
+    }
+    else
+        return static_cast<unsigned char>(c);
 }
 inline std::uint16_t to_unsigned_or_bool(char16_t c)
 {
@@ -193,49 +199,26 @@ void __attribute__((noinline)) insertion_sort_length_2_or_more(It begin, It end,
         }
     }*/
 }
+
+template<typename It, typename Compare>
+inline It min_element_length_2_or_more(It begin, It end, Compare comp)
+{
+    It result = begin;
+    for (++begin;;)
+    {
+        if (comp(*begin, *result))
+            result = begin;
+        ++begin;
+        if (begin == end)
+            return result;
+    }
+}
+
 template<typename It, typename Compare>
 inline void insertion_sort(It begin, It end, Compare compare)
 {
     if (end - begin > 1)
         return insertion_sort_length_2_or_more(begin, end, compare);
-}
-template<typename It, typename Compare>
-void index_sort_length_2_or_more(It begin, It end, Compare compare)
-{
-    size_t num_items = end - begin;
-    size_t num_items_minus_one = num_items - 1;
-    using value_type = typename std::iterator_traits<It>::value_type;
-    value_type * stack_values = static_cast<value_type *>(alloca(num_items * sizeof(value_type)));
-    std::uninitialized_move(begin, end, stack_values);
-    int * indices = static_cast<int *>(alloca(num_items * sizeof(int)));
-    for (size_t i = 0; i < num_items_minus_one; ++i)
-        indices[i] = i;
-    indices[num_items_minus_one] = (num_items * num_items_minus_one) / 2;
-    for (size_t i = 0; i < num_items_minus_one; ++i)
-    {
-        for (size_t j = i + 1; j < num_items_minus_one; ++j)
-        {
-            bool less = compare(stack_values[j], stack_values[i]);
-            indices[i] += less;
-            indices[j] -= less;
-        }
-        bool less = compare(stack_values[num_items_minus_one], stack_values[i]);
-        indices[i] += less;
-    }
-    for (size_t i = 0;; ++i)
-    {
-        begin[indices[i]] = std::move(stack_values[i]);
-        if (i == num_items_minus_one)
-            break;
-        indices[num_items_minus_one] -= indices[i];
-    }
-    std::destroy_n(stack_values, num_items);
-}
-template<typename It, typename Compare>
-void index_sort(It begin, It end, Compare compare)
-{
-    if (end - begin > 1)
-        index_sort_length_2_or_more(begin, end, compare);
 }
 
 template<size_t>
@@ -1376,17 +1359,14 @@ inline void StdSortFallback(It begin, It end, ExtractKey & extract_key)
     std::sort(begin, end, [&](auto && l, auto && r){ return extract_key(l) < extract_key(r); });
 }
 
-template<std::ptrdiff_t UpperLimit, bool UseIndexSort, typename It, typename Compare>
+template<std::ptrdiff_t UpperLimit, typename It, typename Compare>
 inline bool __attribute__((always_inline)) InsertionSortIfLessThanThreshold(It begin, It end, std::ptrdiff_t num_elements, Compare && compare)
 {
     if (num_elements <= 1)
         return true;
     if (num_elements >= UpperLimit)
         return false;
-    if constexpr (UseIndexSort)
-        index_sort_length_2_or_more(begin, end, compare);
-    else
-        insertion_sort_length_2_or_more(begin, end, compare);
+    insertion_sort_length_2_or_more(begin, end, compare);
     return true;
 }
 
@@ -1394,7 +1374,7 @@ template<typename SortSettings, typename It, typename Compare>
 inline static bool __attribute__((always_inline)) DefaultSortIfLessThanThreshold(It begin, It end, std::ptrdiff_t num_elements, Compare && compare)
 {
     using DereferencedType = decltype(*begin);
-    return InsertionSortIfLessThanThreshold<SortSettings::template InsertionSortUpperLimit<DereferencedType>, SortSettings::UseIndexSort>(begin, end, num_elements, compare);
+    return InsertionSortIfLessThanThreshold<SortSettings::template InsertionSortUpperLimit<DereferencedType>>(begin, end, num_elements, compare);
 }
 
 struct DefaultSortSettings
@@ -1414,8 +1394,10 @@ struct DefaultSortSettings
     static constexpr std::ptrdiff_t AmericanFlagSortUpperLimit = 2048;
     static constexpr bool ThreeWaySwapBoost = false;
     static constexpr bool ThreeWaySwapStepanov = false;
-    static constexpr bool UseIndexSort = false;
     static constexpr bool UseFasterCompare = true;
+    static constexpr bool SkaByteSortPrefetch = false;
+    static constexpr bool SkipSortedItems = true;
+    static constexpr std::ptrdiff_t PrefetchAmountLimit = 0;
     static constexpr size_t FirstLoopUnrollAmount = 4;
     static constexpr size_t SecondLoopUnrollAmount = 4;
     using count_type = size_t;

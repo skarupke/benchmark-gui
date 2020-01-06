@@ -952,7 +952,7 @@ static skb::Benchmark * DivisionRange(skb::Benchmark * benchmark, double range_m
     return benchmark->SetRange(4, max)->SetRangeMultiplier(range_multiplier);
 }
 
-skb::BenchmarkCategories DivisionCategories(std::string benchmark_name, std::string int_type)
+skb::BenchmarkCategories DivisionCategories(interned_string benchmark_name, interned_string int_type)
 {
     skb::BenchmarkCategories categories("instructions", std::move(benchmark_name));
     categories.AddCategory("instruction", "division");
@@ -961,13 +961,13 @@ skb::BenchmarkCategories DivisionCategories(std::string benchmark_name, std::str
 }
 
 template<typename T>
-void RegisterDivisionTyped(std::string int_type)
+void RegisterDivisionTyped(interned_string int_type)
 {
-    std::string baseline_name = "baseline_division_" + int_type;
-    std::string baseline_random_random_name = "baseline_division_random_random_" + int_type;
+    interned_string baseline_name = "baseline_division_" + int_type;
+    interned_string baseline_random_random_name = "baseline_division_random_random_" + int_type;
     SKA_BENCHMARK_NAME(benchmark_division_baseline<T>, "baseline", baseline_name);
     SKA_BENCHMARK_NAME(benchmark_division_baseline_random_random<T>, "baseline", baseline_random_random_name);
-    auto categories_for = [int_type](std::string benchmark_name)
+    auto categories_for = [int_type](interned_string benchmark_name)
     {
         return DivisionCategories(std::move(benchmark_name), int_type);
     };

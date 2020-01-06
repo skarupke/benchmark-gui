@@ -548,7 +548,7 @@ struct BenchmarkMemorySize<std::pair<A, B>>
 template<typename T>
 skb::Benchmark * LookupRange(skb::Benchmark * benchmark)
 {
-    int upper_limit = 32 * 1024 * 1024;
+    int upper_limit = 16 * 1024 * 1024;
     upper_limit = std::min(upper_limit, std::numeric_limits<int>::max() / int(BenchmarkMemorySize<typename T::value_type>::value));
 
     if (UpperLimitOverride<T>::value < upper_limit)
@@ -589,20 +589,21 @@ struct MaxSupportedLoadFactor
     static constexpr float value = 1.0f;
 };
 
-inline std::string KeyCategoryString(const skb::CategoryBuilder & categories)
+inline interned_string KeyCategoryString(const skb::CategoryBuilder & categories)
 {
-    auto found = categories.categories.find("key");
+    static const interned_string key_str("key");
+    auto found = categories.categories.find(key_str);
     CHECK_FOR_PROGRAMMER_ERROR(found != categories.categories.end());
     return found->second;
 }
 
 template<typename T>
-void RegisterLookup(const std::string & name, skb::CategoryBuilder categories)
+void RegisterLookup(const interned_string & name, skb::CategoryBuilder categories)
 {
     skb::CategoryBuilder successful = categories.AddCategory("hashtable type", "lookup").AddCategory("lookup type", "successful");
     skb::CategoryBuilder unsuccessful = categories.AddCategory("hashtable type", "lookup").AddCategory("lookup type", "unsuccessful");
     using distribution_type = BenchmarkRandomDistribution<typename T::key_type>;
-    std::string key_str = KeyCategoryString(categories);
+    interned_string key_str = KeyCategoryString(categories);
     for (float max_load_factor : { 0.0f, 0.5f, 0.875f, 0.9375f, 1.0f })
     {
         if (max_load_factor > MaxSupportedLoadFactor<T>::value)
@@ -643,12 +644,12 @@ void RegisterLookup(const std::string & name, skb::CategoryBuilder categories)
             for (std::pair<float, std::string> worst : std::vector<std::pair<float, std::string>>{ { 0.25f, "25" }, { 0.1f, "10" }, { 0.01f, "1" } })
             {
                 benchmark_successful_lookup_predictable_best_worst_n<T> worst_n_lookup(worst.first, false);
-                LookupRange<T>(SKA_BENCHMARK_CATEGORIES(worst_n_lookup, add_max_load_factor_category(num_lookups_categories.AddCategory("best or worst", "worst " + worst.second + "%"), max_load_factor).BuildCategories("hashtable", name))->SetBaseline("benchmark_successful_lookup_predictable_best_worst_baseline_" + worst.second + "_" + key_str));
+                LookupRange<T>(SKA_BENCHMARK_CATEGORIES(worst_n_lookup, add_max_load_factor_category(num_lookups_categories.AddCategory("best or worst", interned_string("worst " + worst.second + "%")), max_load_factor).BuildCategories("hashtable", name))->SetBaseline("benchmark_successful_lookup_predictable_best_worst_baseline_" + worst.second + "_" + key_str));
             }
             for (std::pair<float, std::string> best : std::vector<std::pair<float, std::string>>{ { 0.25f, "25" }, { 0.1f, "10" } })
             {
                 benchmark_successful_lookup_predictable_best_worst_n<T> best_n_lookup(best.first, true);
-                LookupRange<T>(SKA_BENCHMARK_CATEGORIES(best_n_lookup, add_max_load_factor_category(num_lookups_categories.AddCategory("best or worst", "best " + best.second + "%"), max_load_factor).BuildCategories("hashtable", name))->SetBaseline("benchmark_successful_lookup_predictable_best_worst_baseline_" + best.second + "_" + key_str));
+                LookupRange<T>(SKA_BENCHMARK_CATEGORIES(best_n_lookup, add_max_load_factor_category(num_lookups_categories.AddCategory("best or worst", interned_string("best " + best.second + "%")), max_load_factor).BuildCategories("hashtable", name))->SetBaseline("benchmark_successful_lookup_predictable_best_worst_baseline_" + best.second + "_" + key_str));
             }
         }
 
@@ -810,7 +811,7 @@ struct ReplaceTemplateArgument<Template<A, ToReplace, C, D, E, F, G, H, I>, ToRe
 template<typename T>
 struct RegisterValueCombinations
 {
-    void operator()(const std::string & name, skb::CategoryBuilder categories_so_far)
+    void operator()(const interned_string & name, skb::CategoryBuilder categories_so_far)
     {
         using int_type = typename ReplaceTemplateArgument<T, ValuePlaceHolder, int>::type;
         RegisterLookup<int_type>(name, categories_so_far.AddCategory("value", "int"));
@@ -826,7 +827,7 @@ struct RegisterValueCombinations
 template<typename T>
 struct RegisterLookups
 {
-    void operator()(const std::string & name, skb::CategoryBuilder categories_so_far)
+    void operator()(const interned_string & name, skb::CategoryBuilder categories_so_far)
     {
         using int_type = typename ReplaceTemplateArgument<T, KeyPlaceHolder, int>::type;
         RegisterValueCombinations<int_type>()(name, categories_so_far.AddCategory("key", "int"));

@@ -401,7 +401,7 @@ BENCHMARK_TEMPLATE(knucleotide, ska::bytell_hash_map<KNucleotideHash, int64_t, K
 BENCHMARK_TEMPLATE(knucleotide, ska::bytell_hash_map<KNucleotideHash, int64_t, KNucleotideHash::hash>);
 BENCHMARK_TEMPLATE(knucleotide, ska::bytell_hash_map<KNucleotideHash, int64_t, KNucleotideHash::prime_hash>);
 BENCHMARK_TEMPLATE(knucleotide, ska::bytell_hash_map<KNucleotideHash, int64_t, KNucleotideHash::switch_prime_hash>);
-BENCHMARK_TEMPLATE(knucleotide, google::dense_hash_map<KNucleotideHash, int64_t, KNucleotideHash::hash>);
+//BENCHMARK_TEMPLATE(knucleotide, google::dense_hash_map<KNucleotideHash, int64_t, KNucleotideHash::hash>);
 BENCHMARK_TEMPLATE(knucleotide, ska::flat16_hash_map<KNucleotideHash, int64_t, KNucleotideHash::hash>);
 BENCHMARK_TEMPLATE(knucleotide, ska::ptr_hash_map<KNucleotideHash, int64_t, KNucleotideHash::hash>);
 BENCHMARK_TEMPLATE(knucleotide, ska::unordered_map<KNucleotideHash, int64_t, KNucleotideHash::hash>);
