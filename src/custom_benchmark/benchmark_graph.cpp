@@ -241,6 +241,33 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
         return y_percent * lines_size.height();
     };
 
+    auto yval_from_result = [&](const skb::RunResults & median, skb::BenchmarkResults * baseline)
+    {
+        double time = median.GetNanosecondsPerItem(baseline);
+        if (normalize_for_memory && median.num_bytes_used > 0 && median.argument > 0)
+        {
+            double memory_per_item = median.num_bytes_used / static_cast<double>(median.argument);
+            time *= memory_per_item;
+        }
+        return time;
+    };
+
+    static const QColor colors[12] =
+    {
+        QColor(0x1f, 0x78, 0xb4), // blue
+        QColor(0x33, 0xa0, 0x2c), // green
+        QColor(0xe3, 0x1a, 0x1c), // red
+        QColor(0xff, 0x7f, 0x00), // orange
+        QColor(0x6a, 0x3d, 0x9a), // purple
+        QColor(0xb1, 0x59, 0x28), // brown
+        QColor(0xa6, 0xce, 0xe3), // light blue
+        QColor(0xb2, 0xdf, 0x8a), // light green
+        QColor(0xfb, 0x9a, 0x99), // light red
+        QColor(0xfd, 0xbf, 0x6f), // light orange
+        QColor(0xca, 0xb2, 0xd6), // light purple
+        QColor(0x46, 0x33, 0x05), // dark brown
+    };
+
     if (lines_dirty || lines.size() != overall_size)
     {
         lines_dirty = false;
@@ -250,17 +277,6 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
         xmax = std::numeric_limits<int>::lowest();
         ymin = 0.0;
         ymax = std::numeric_limits<double>::lowest();
-
-        auto yval_from_result = [&](const skb::RunResults & median, skb::BenchmarkResults * baseline)
-        {
-            double time = median.GetNanosecondsPerItem(baseline);
-            if (normalize_for_memory && median.num_bytes_used > 0 && median.argument > 0)
-            {
-                double memory_per_item = median.num_bytes_used / static_cast<double>(median.argument);
-                time *= memory_per_item;
-            }
-            return time;
-        };
 
         for (skb::BenchmarkResults * benchmark : data)
         {
@@ -288,22 +304,6 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
             return;
         log_xmin = std::log(xmin);
         log_xrange = std::log(xmax) - log_xmin;
-
-        QColor colors[12] =
-        {
-            QColor(0x1f, 0x78, 0xb4), // blue
-            QColor(0x33, 0xa0, 0x2c), // green
-            QColor(0xe3, 0x1a, 0x1c), // red
-            QColor(0xff, 0x7f, 0x00), // orange
-            QColor(0x6a, 0x3d, 0x9a), // purple
-            QColor(0xb1, 0x59, 0x28), // brown
-            QColor(0xa6, 0xce, 0xe3), // light blue
-            QColor(0xb2, 0xdf, 0x8a), // light green
-            QColor(0xfb, 0x9a, 0x99), // light red
-            QColor(0xfd, 0xbf, 0x6f), // light orange
-            QColor(0xca, 0xb2, 0xd6), // light purple
-            QColor(0x46, 0x33, 0x05), // dark brown
-        };
 
         graph_painter.fillRect(QRectF(QPointF(position_x(xmin), position_y(ymin)), QPointF(position_x(xmax), position_y(ymax))), QColor(255, 255, 255));
 
@@ -353,7 +353,7 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
                 }
                 else
                     path.lineTo(point);
-                points.push_back({benchmark, median->argument, point.x(), point.y()});
+                points.push_back({benchmark, median->argument, point.x(), point.y(), color_choice});
             }
             if (first)
                 continue;
@@ -368,6 +368,7 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
     my_painter.drawImage(0, 0, lines);
     highlighted_benchmark = nullptr;
     highlighted_argument = 0;
+    int highlighted_color = 0;
     float closest_point_distance = squared(20.0f);
     QPointF closest_point;
     QPoint cursor_pos = mapFromGlobal(QCursor::pos());
@@ -380,6 +381,7 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
             highlighted_benchmark = point.benchmark;
             closest_point_distance = distance;
             closest_point = QPointF(point.x, point.y);
+            highlighted_color = point.color;
         }
     }
     if (highlighted_benchmark)
@@ -397,6 +399,56 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
         double y_zero = position_y(ymin);
         my_painter.drawLine(QPointF(closest_point.x(), y_zero), QPointF(closest_point.x(), y_zero + tick_length));
         my_painter.drawLine(QPointF(x_zero, closest_point.y()), QPointF(x_zero - tick_length, closest_point.y()));
+
+        bool has_previous = false;
+        double last_mean = 0.0;
+        double last_stddev = 0.0;
+        int last_key = 0;
+        skb::BenchmarkResults * baseline = highlighted_benchmark->baseline_results;
+        for (const auto & one_point_result : highlighted_benchmark->results)
+        {
+            if (one_point_result.second.size() < 2)
+            {
+                has_previous = false;
+                continue;
+            }
+            double mean = 0.0;
+            double std_dev = 0.0;
+            for (const skb::RunResults & result : one_point_result.second)
+            {
+                double yval = yval_from_result(result, baseline);
+                mean += yval;
+            }
+            mean /= one_point_result.second.size();
+            for (const skb::RunResults & result : one_point_result.second)
+                std_dev += squared(mean - yval_from_result(result, baseline));
+            std_dev /= one_point_result.second.size();
+            std_dev = std::sqrt(std_dev);
+            if (has_previous)
+            {
+                double last_min = position_y(last_mean - last_stddev);
+                double last_max = position_y(last_mean + last_stddev);
+                double min = position_y(mean - std_dev);
+                double max = position_y(mean + std_dev);
+                double last_x = position_x(last_key);
+                double x = position_x(one_point_result.first);
+                QColor color = colors[highlighted_color];
+                color.setAlpha(color.alpha() / 8);
+                my_painter.setPen(Qt::NoPen);
+                QPainterPath path;
+                CHECK_FOR_PROGRAMMER_ERROR(!std::isnan(last_x) && !std::isnan(last_min) && !std::isnan(last_max)
+                                           && !std::isnan(x) && !std::isnan(min) && !std::isnan(max));
+                path.moveTo(last_x, last_min);
+                path.lineTo(last_x, last_max);
+                path.lineTo(x, max);
+                path.lineTo(x, min);
+                my_painter.fillPath(path, QBrush(color));
+            }
+            has_previous = true;
+            last_mean = mean;
+            last_stddev = std_dev;
+            last_key = one_point_result.first;
+        }
     }
     else
     {

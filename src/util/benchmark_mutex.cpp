@@ -9,11 +9,8 @@
 #include <array>
 #include <condition_variable>
 #include <shared_mutex>
+#include "thread/custom_mutex.hpp"
 #include <semaphore.h>
-#include <unistd.h>
-#include <sys/syscall.h>
-#include <linux/futex.h>
-#include <atomic>
 #include <cstring>
 #include <emmintrin.h>
 #include <boost/thread/mutex.hpp>
@@ -170,7 +167,7 @@ private:
     std::atomic<unsigned> out{0};
 };
 
-struct futex_mutex
+struct futex_mutex_careful_wake
 {
     void lock()
     {
@@ -229,38 +226,6 @@ struct futex_mutex_counted
     {
         if (state.fetch_and(~locked, std::memory_order_release) >= sleeper)
             syscall(SYS_futex, &state, FUTEX_WAKE_PRIVATE, 1, nullptr, nullptr, 0);
-    }
-
-private:
-    std::atomic<unsigned> state{unlocked};
-
-    static constexpr unsigned unlocked = 0;
-    static constexpr unsigned locked = 1;
-    static constexpr unsigned sleeper = 2;
-};
-struct futex_mutex_wake_one
-{
-    void lock()
-    {
-        if (state.exchange(locked, std::memory_order_acquire) == unlocked)
-            return;
-        while (state.exchange(sleeper, std::memory_order_acquire) != unlocked)
-        {
-            syscall(SYS_futex, &state, FUTEX_WAIT_PRIVATE, sleeper, nullptr, nullptr, 0);
-        }
-    }
-    void unlock()
-    {
-        if (state.exchange(unlocked, std::memory_order_release) == sleeper)
-            syscall(SYS_futex, &state, FUTEX_WAKE_PRIVATE, 1, nullptr, nullptr, 0);
-    }
-
-    // this function is only called from the condition variable code below
-    // it tells this mutex that it has to call FUTEX_WAKE later
-    void set_to_wake_later()
-    {
-        CHECK_FOR_PROGRAMMER_ERROR(state.load(std::memory_order_relaxed) >= locked);
-        state.store(sleeper, std::memory_order_relaxed);
     }
 
 private:
@@ -404,9 +369,9 @@ private:
     }
 };
 
-struct futex_condition_variable
+struct futex_condition_variable_counted
 {
-    void wait(std::unique_lock<futex_mutex_wake_one> & lock)
+    void wait(std::unique_lock<futex_mutex> & lock)
     {
         unsigned to_compare = state.fetch_add(waiters_to_add_bit, std::memory_order_relaxed) + waiters_to_add_bit;
         lock.unlock();
@@ -426,7 +391,7 @@ struct futex_condition_variable
             lock.mutex()->set_to_wake_later();
     }
     template<typename Predicate>
-    void wait(std::unique_lock<futex_mutex_wake_one> & lock, Predicate predicate)
+    void wait(std::unique_lock<futex_mutex> & lock, Predicate predicate)
     {
         while (!predicate())
             wait(lock);
@@ -461,7 +426,7 @@ struct futex_condition_variable
     // then they will immediately block because they're all trying to acquire the mutex
     // at the same time. this one instead transfers the sleepers to the lock, so they
     // all get woken up one at a time as the lock unlocks.
-    void notify_all(futex_mutex_wake_one & mutex)
+    void notify_all(futex_mutex & mutex)
     {
         unsigned old_value = state.load(std::memory_order_relaxed);
         while ((old_value / need_to_wake_bit) < (old_value % need_to_wake_bit))
@@ -707,7 +672,7 @@ private:
     std::atomic<uint16_t> state{0};
     static constexpr uint16_t waiters_to_add_bit = 0x100;
 
-    inline static bool wake_all_pattern(uint16_t old_value)
+    inline static uint16_t wake_all_pattern(uint16_t old_value)
     {
         uint16_t num_waiters = old_value / waiters_to_add_bit;
         return num_waiters * (waiters_to_add_bit + 1);
@@ -737,7 +702,7 @@ private:
 
 struct futex_condition_variable_one_byte
 {
-    void wait(std::unique_lock<futex_mutex_wake_one> & lock)
+    void wait(std::unique_lock<futex_mutex> & lock)
     {
         uint8_t loaded = state.load(std::memory_order_relaxed);
         lock.unlock();
@@ -775,7 +740,7 @@ struct futex_condition_variable_one_byte
             lock.mutex()->set_to_wake_later();
     }
     template<typename Predicate>
-    void wait(std::unique_lock<futex_mutex_wake_one> & lock, Predicate predicate)
+    void wait(std::unique_lock<futex_mutex> & lock, Predicate predicate)
     {
         while (!predicate())
             wait(lock);
@@ -814,7 +779,7 @@ struct futex_condition_variable_one_byte
     // then they will immediately block because they're all trying to acquire the mutex
     // at the same time. this one instead transfers the sleepers to the lock, so they
     // all get woken up one at a time as the lock unlocks.
-    void notify_all(futex_mutex_wake_one & mutex)
+    void notify_all(futex_mutex & mutex)
     {
         uint8_t old_value = state.load(std::memory_order_relaxed);
         while (old_value & has_sleeper_bit)
@@ -1914,8 +1879,8 @@ void benchmark_mutex_lock_unlock(benchmark::State& state)
 
 #define RegisterBenchmarkWithAllMutexes(benchmark, ...)\
     BENCHMARK_TEMPLATE(benchmark, std::mutex) __VA_ARGS__;\
-    /*BENCHMARK_TEMPLATE(benchmark, std::shared_mutex) __VA_ARGS__;\
-    BENCHMARK_TEMPLATE(benchmark, std::recursive_mutex) __VA_ARGS__;\
+    BENCHMARK_TEMPLATE(benchmark, std::shared_mutex) __VA_ARGS__;\
+    /*BENCHMARK_TEMPLATE(benchmark, std::recursive_mutex) __VA_ARGS__;\
     BENCHMARK_TEMPLATE(benchmark, boost::mutex) __VA_ARGS__;\
     BENCHMARK_TEMPLATE(benchmark, boost::shared_mutex) __VA_ARGS__;\
     BENCHMARK_TEMPLATE(benchmark, boost::recursive_mutex) __VA_ARGS__;*/\
@@ -1923,8 +1888,8 @@ void benchmark_mutex_lock_unlock(benchmark::State& state)
     /*BENCHMARK_TEMPLATE(benchmark, pthread_mutex_recursive) __VA_ARGS__;*/\
     BENCHMARK_TEMPLATE(benchmark, pthread_mutex_adaptive) __VA_ARGS__;\
     BENCHMARK_TEMPLATE(benchmark, pthread_spinlock) __VA_ARGS__;\
+    BENCHMARK_TEMPLATE(benchmark, futex_mutex_careful_wake) __VA_ARGS__;\
     BENCHMARK_TEMPLATE(benchmark, futex_mutex) __VA_ARGS__;\
-    BENCHMARK_TEMPLATE(benchmark, futex_mutex_wake_one) __VA_ARGS__;\
     /*BENCHMARK_TEMPLATE(benchmark, two_byte_futex_mutex) __VA_ARGS__;*/\
     BENCHMARK_TEMPLATE(benchmark, futex_mutex_tricky) __VA_ARGS__;\
     BENCHMARK_TEMPLATE(benchmark, spin_to_futex_mutex) __VA_ARGS__;\
@@ -2074,10 +2039,10 @@ struct ThreadedBenchmarkRunner
                     CPU_SET(i, &cpuset);
                     pthread_setaffinity_np(threads[i].native_handle(), sizeof(cpu_set_t), &cpuset);
                 }*/
-                cpu_set_t cpuset;
+                /*cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
                 CPU_SET(5, &cpuset);
-                pthread_setaffinity_np(threads[i].native_handle(), sizeof(cpu_set_t), &cpuset);
+                pthread_setaffinity_np(threads[i].native_handle(), sizeof(cpu_set_t), &cpuset);*/
                 for (;;)
                 {
                     finished.release();
@@ -2572,6 +2537,7 @@ struct LongestIdleRunner
                 current_longest_idle = wait_time_nanos;
             time_before = std::chrono::high_resolution_clock::now();
             mutex.unlock();
+            //std::this_thread::yield();
         }
     }
 };
@@ -3232,8 +3198,8 @@ void RegisterMutex()
     RegisterAllBenchmarks<pthread_mutex>(categories_so_far, "pthread_mutex");
     RegisterAllBenchmarks<pthread_mutex_recursive>(categories_so_far, "pthread_mutex_recursive");
     RegisterAllBenchmarks<pthread_mutex_adaptive>(categories_so_far, "pthread_mutex_adaptive");
-    RegisterAllBenchmarks<futex_mutex>(categories_so_far, "futex_mutex");
-    RegisterAllBenchmarks<futex_mutex_wake_one>(categories_so_far.AddCategory("futex size", "32 bits"), "futex_mutex_wake_one");
+    RegisterAllBenchmarks<futex_mutex_careful_wake>(categories_so_far, "futex_mutex");
+    RegisterAllBenchmarks<futex_mutex>(categories_so_far.AddCategory("futex size", "32 bits"), "futex_mutex_wake_one");
     //RegisterAllBenchmarks<futex_mutex_wake_one_8>(categories_so_far.AddCategory("futex size", "8 bits"), "futex_mutex_wake_one");
     //RegisterAllBenchmarks<futex_mutex_wake_one_16>(categories_so_far.AddCategory("futex size", "16 bits"), "futex_mutex_wake_one");
     RegisterAllBenchmarks<futex_mutex_counted>(categories_so_far, "futex_mutex_counted");
@@ -3293,32 +3259,6 @@ void RegisterMutex()
     /*BENCHMARK_TEMPLATE(benchmark, two_byte_futex_mutex) __VA_ARGS__;*/\
 
 #endif
-}
-
-TEST(futex_mutex, four_bytes)
-{
-    futex_mutex_wake_one lock;
-    std::atomic<int> state{0};
-    auto test = [&]
-    {
-        for (int i = 0; i < 1024; ++i)
-        {
-            lock.lock();
-            ASSERT_EQ(0, state.fetch_add(1, std::memory_order_relaxed));
-            ASSERT_EQ(1, state.fetch_sub(1, std::memory_order_relaxed));
-            lock.unlock();
-        }
-    };
-    std::vector<std::thread> threads;
-    threads.reserve(std::thread::hardware_concurrency());
-    while (threads.size() != threads.capacity())
-    {
-        threads.emplace_back(test);
-    }
-    for (std::thread & t : threads)
-    {
-        t.join();
-    }
 }
 
 TEST(futex_mutex, DISABLED_one_byte)
@@ -3399,10 +3339,10 @@ TEST(k42_mutex, mutex)
     }
 }
 
-TEST(futex_mutex, condition_variable)
+TEST(futex_mutex, condition_variable_counted)
 {
-    futex_mutex_wake_one mutex;
-    futex_condition_variable cv;
+    futex_mutex mutex;
+    futex_condition_variable_counted cv;
 
     int num_work = 0;
     std::vector<std::thread> threads;
@@ -3410,7 +3350,7 @@ TEST(futex_mutex, condition_variable)
     threads.reserve(num_workers);
     auto do_work = [&]
     {
-        std::unique_lock<futex_mutex_wake_one> lock(mutex);
+        std::unique_lock<futex_mutex> lock(mutex);
         cv.wait(lock, [&]
         {
             return num_work > 0;

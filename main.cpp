@@ -465,6 +465,7 @@ extern void count_num_lookups();
 extern void test_iaca(int to_find);
 extern void RegisterSorting();
 extern void RegisterMutex();
+extern void RegisterHeapBenchmarks();
 
 #ifndef FUZZER_BUILD
 int main(int argc, char * argv[])
@@ -474,6 +475,7 @@ int main(int argc, char * argv[])
     RegisterBitIterBenchmarks();
     RegisterSorting();
     RegisterMutex();
+    RegisterHeapBenchmarks();
 
     if (skb::RunSingleBenchmarkFromCommandLine(argc, argv))
         return 0;
@@ -483,7 +485,7 @@ int main(int argc, char * argv[])
     if (result)
         return result;
 
-#if 1
+#if 0
     ::benchmark::Initialize(&argc, argv);
     if (::benchmark::RunSpecifiedBenchmarks())
         return 0;

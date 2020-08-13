@@ -56,6 +56,7 @@ private:
         int argument;
         double x;
         double y;
+        int color;
     };
     std::vector<DrawnPoint> points;
     int xmin = 0;

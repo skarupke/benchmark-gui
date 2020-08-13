@@ -3,7 +3,7 @@ COPPERSPICE_DIRECTORY = tup.getcwd() .. '/libs/copperspice-1.4.4/'
 COPPERSPICE_LIB_DIR = COPPERSPICE_DIRECTORY .. 'lib'
 
 LINK_FLAGS += '-pthread'
---LINK_FLAGS += '-fuse-ld=gold'
+LINK_FLAGS += '-fuse-ld=gold'
 -- the next two lines are for incremental linking.
 -- they are turned off because they seem to be slower
 -- right now. maybe use it when the project gets bigger
@@ -23,6 +23,7 @@ LINK_LIBS += '-lsqlite3'
 LINK_LIBS += '-lboost_system'
 LINK_LIBS += '-lboost_thread'
 LINK_LIBS += '-lstdc++fs'
+LINK_LIBS += '-ldispatch'
 
 INCLUDE_DIRS += tup.getcwd() .. '/src'
 INCLUDE_DIRS += tup.getcwd() .. '/libs'
@@ -50,7 +51,9 @@ INPUT_FOLDERS += 'src/hashtable_benchmarks/by_container/'
 INPUT_FOLDERS += 'src/math/'
 INPUT_FOLDERS += 'src/memory/'
 INPUT_FOLDERS += 'src/signals/'
+INPUT_FOLDERS += 'src/sorting_benchmarks/'
 INPUT_FOLDERS += 'src/test/'
+INPUT_FOLDERS += 'src/thread/'
 INPUT_FOLDERS += 'src/util/'
 INPUT_FOLDERS += 'libs/benchmark/src/'
 INPUT_FOLDERS += 'libs/Raduls/'

@@ -2,6 +2,7 @@
 
 #include <iterator>
 #include <algorithm>
+#include "heap.hpp"
 
 // finds the matching closing bracket. for example
 //
@@ -155,23 +156,6 @@ size_t find_index(It begin, It end, const V & value)
             return i;
     }
     return static_cast<size_t>(-1);
-}
-
-template<typename It, typename ValueType, typename Compare>
-void heap_replace_top(It begin, It end, ValueType && value, Compare && compare)
-{
-    using std::swap;
-    *begin = std::forward<ValueType>(value);
-    std::ptrdiff_t length = end - begin;
-    for (std::ptrdiff_t current = 0, first_child = 1; length > first_child; first_child = current * 2 + 1)
-    {
-        std::ptrdiff_t second_child = first_child + 1;
-        std::ptrdiff_t larger_child = (second_child != length && compare(begin[first_child], begin[second_child])) ? second_child : first_child;
-        if (!compare(begin[current], begin[larger_child]))
-            return;
-        swap(begin[current], begin[larger_child]);
-        current = larger_child;
-    }
 }
 
 template<typename It, typename OutIt, typename Compare>
