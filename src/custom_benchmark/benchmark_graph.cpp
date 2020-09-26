@@ -129,6 +129,12 @@ void BenchmarkGraph::SetNormalizeForMemory(bool value)
     lines_dirty = true;
     update();
 }
+void BenchmarkGraph::SetDrawAsPoints(bool value)
+{
+    draw_as_points = value;
+    lines_dirty = true;
+    update();
+}
 
 QSize BenchmarkGraph::sizeHint() const
 {
@@ -329,39 +335,68 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
 
         points.clear();
         int color_choice = 0;
+        std::vector<QPointF> benchmark_points;
         for (skb::BenchmarkResults * benchmark : data)
         {
             std::lock_guard<std::mutex> lock(benchmark->results_mutex);
             skb::BenchmarkResults * baseline = benchmark->baseline_results;
 
-            QPainterPath path;
-
-            bool first = true;
-            for (auto & range : benchmark->results)
+            if (draw_as_points)
             {
-                if (range.first <= 0 || range.second.empty())
-                    continue;
-                auto median = range.second.begin();
+                benchmark_points.clear();
 
-                int xvalue = median->argument;
-                double yvalue = yval_from_result(*median, baseline);
-                QPointF point(position_x(xvalue), position_y(yvalue));
-                if (first)
+                for (auto & range : benchmark->results)
                 {
-                    first = false;
-                    path.moveTo(point);
+                    if (range.first <= 0)
+                        continue;
+                    for (const skb::RunResults & result : range.second)
+                    {
+                        int xvalue = result.argument;
+                        double yvalue = yval_from_result(result, baseline);
+                        QPointF point(position_x(xvalue), position_y(yvalue));
+                        benchmark_points.push_back(point);
+                        points.push_back({benchmark, result.argument, point.x(), point.y(), color_choice});
+                    }
                 }
-                else
-                    path.lineTo(point);
-                points.push_back({benchmark, median->argument, point.x(), point.y(), color_choice});
+                if (benchmark_points.empty())
+                    continue;
+                QPen pen(colors[color_choice]);
+                pen.setWidthF(line_width);
+                graph_painter.setPen(pen);
+                color_choice = (color_choice + 1) % std::extent<decltype(colors)>::value;
+                graph_painter.drawPoints(benchmark_points.data(), static_cast<int>(benchmark_points.size()));
             }
-            if (first)
-                continue;
-            QPen pen(colors[color_choice]);
-            pen.setWidthF(line_width);
-            graph_painter.setPen(pen);
-            color_choice = (color_choice + 1) % std::extent<decltype(colors)>::value;
-            graph_painter.drawPath(path);
+            else
+            {
+                QPainterPath path;
+
+                bool first = true;
+                for (auto & range : benchmark->results)
+                {
+                    if (range.first <= 0 || range.second.empty())
+                        continue;
+                    auto median = range.second.begin();
+
+                    int xvalue = median->argument;
+                    double yvalue = yval_from_result(*median, baseline);
+                    QPointF point(position_x(xvalue), position_y(yvalue));
+                    if (first)
+                    {
+                        first = false;
+                        path.moveTo(point);
+                    }
+                    else
+                        path.lineTo(point);
+                    points.push_back({benchmark, median->argument, point.x(), point.y(), color_choice});
+                }
+                if (first)
+                    continue;
+                QPen pen(colors[color_choice]);
+                pen.setWidthF(line_width);
+                graph_painter.setPen(pen);
+                color_choice = (color_choice + 1) % std::extent<decltype(colors)>::value;
+                graph_painter.drawPath(path);
+            }
         }
     }
 

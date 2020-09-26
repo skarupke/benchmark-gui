@@ -4,6 +4,7 @@
 #ifndef DISABLE_TESTS
 #include "test/include_test.hpp"
 #include <random>
+#include <atomic>
 
 TEST(interval_heap, is_valid)
 {
@@ -355,22 +356,6 @@ TEST(minmax_heap, make_minmax_heap)
     }
 }
 
-TEST(minmax_heap, custom_make_heap)
-{
-    std::mt19937_64 randomness(5);
-    std::uniform_int_distribution<int> distribution(0, 100);
-    std::vector<int> heap;
-    int num = 100;
-    heap.reserve(num);
-    for (int i = 0; i < num; ++i)
-    {
-        std::shuffle(heap.begin(), heap.end(), randomness);
-        heap.push_back(distribution(randomness));
-        custom_make_heap(heap.begin(), heap.end());
-        ASSERT_TRUE(std::is_heap(heap.begin(), heap.end()));
-    }
-}
-
 TEST(dary_heap, parent_index)
 {
     ASSERT_EQ(0, dary_heap_helpers::parent_index<2>(1));
@@ -481,36 +466,218 @@ TEST(dary_heap, push_dary_heap)
 {
     std::mt19937_64 randomness(5);
     std::uniform_int_distribution<int> distribution(0, 100);
-    std::vector<int> heap[7];
+    std::vector<int> heap[14];
     int num = 100;
-    for (int i = 0; i < 7; ++i)
+    for (int i = 0; i < 14; ++i)
         heap[i].reserve(num);
     for (int i = 0; i < num; ++i)
     {
-        for (int j = 0; j < 7; ++j)
+        for (int j = 0; j < 14; ++j)
             heap[j].push_back(distribution(randomness));
 
-        push_dary_heap<2>(heap[0].begin(), heap[0].end());
-        ASSERT_TRUE(is_dary_heap<2>(heap[0].begin(), heap[0].end()));
-        ASSERT_TRUE(std::is_heap(heap[0].begin(), heap[0].end()));
+        int j = 0;
+        push_dary_heap<2>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<2>(heap[j].begin(), heap[j].end()));
+        ASSERT_TRUE(std::is_heap(heap[j].begin(), heap[j].end()));
 
-        push_dary_heap<3>(heap[1].begin(), heap[1].end());
-        ASSERT_TRUE(is_dary_heap<3>(heap[1].begin(), heap[1].end()));
+        ++j;
+        push_dary_heap<3>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<3>(heap[j].begin(), heap[j].end()));
 
-        push_dary_heap<4>(heap[2].begin(), heap[2].end());
-        ASSERT_TRUE(is_dary_heap<4>(heap[2].begin(), heap[2].end()));
+        ++j;
+        push_dary_heap<4>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<4>(heap[j].begin(), heap[j].end()));
 
-        push_dary_heap<5>(heap[3].begin(), heap[3].end());
-        ASSERT_TRUE(is_dary_heap<5>(heap[3].begin(), heap[3].end()));
+        ++j;
+        push_dary_heap<5>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<5>(heap[j].begin(), heap[j].end()));
 
-        push_dary_heap<6>(heap[4].begin(), heap[4].end());
-        ASSERT_TRUE(is_dary_heap<6>(heap[4].begin(), heap[4].end()));
+        ++j;
+        push_dary_heap<6>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<6>(heap[j].begin(), heap[j].end()));
 
-        push_dary_heap<7>(heap[5].begin(), heap[5].end());
-        ASSERT_TRUE(is_dary_heap<7>(heap[5].begin(), heap[5].end()));
+        ++j;
+        push_dary_heap<7>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<7>(heap[j].begin(), heap[j].end()));
 
-        push_dary_heap<8>(heap[6].begin(), heap[6].end());
-        ASSERT_TRUE(is_dary_heap<8>(heap[6].begin(), heap[6].end()));
+        ++j;
+        push_dary_heap<8>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<8>(heap[j].begin(), heap[j].end()));
+
+        ++j;
+        push_dary_heap_grandparent<2>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<2>(heap[j].begin(), heap[j].end()));
+        ASSERT_TRUE(std::is_heap(heap[j].begin(), heap[j].end()));
+
+        ++j;
+        push_dary_heap_grandparent<3>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<3>(heap[j].begin(), heap[j].end()));
+
+        ++j;
+        push_dary_heap_grandparent<4>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<4>(heap[j].begin(), heap[j].end()));
+
+        ++j;
+        push_dary_heap_grandparent<5>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<5>(heap[j].begin(), heap[j].end()));
+
+        ++j;
+        push_dary_heap_grandparent<6>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<6>(heap[j].begin(), heap[j].end()));
+
+        ++j;
+        push_dary_heap_grandparent<7>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<7>(heap[j].begin(), heap[j].end()));
+
+        ++j;
+        push_dary_heap_grandparent<8>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<8>(heap[j].begin(), heap[j].end()));
+    }
+}
+TEST(dary_heap, push_dary_heap_great_grandparent)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 1000);
+    std::vector<int> heap[2];
+    int num = 10000;
+    for (int i = 0; i < 2; ++i)
+        heap[i].reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        for (int j = 0; j < 2; ++j)
+            heap[j].push_back(distribution(randomness));
+
+        int j = 0;
+        push_dary_heap_great_grandparent<2>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<2>(heap[j].begin(), heap[j].end()));
+        ASSERT_TRUE(std::is_heap(heap[j].begin(), heap[j].end()));
+
+        ++j;
+        push_dary_heap_great_grandparent<4>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<4>(heap[j].begin(), heap[j].end()));
+    }
+}
+TEST(dary_heap, push_dary_heap_great_great_grandparent)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 1000);
+    std::vector<int> heap[2];
+    int num = 10000;
+    for (int i = 0; i < 2; ++i)
+        heap[i].reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        for (int j = 0; j < 2; ++j)
+            heap[j].push_back(distribution(randomness));
+
+        int j = 0;
+        push_dary_heap_great_great_grandparent<2>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<2>(heap[j].begin(), heap[j].end()));
+        ASSERT_TRUE(std::is_heap(heap[j].begin(), heap[j].end()));
+
+        ++j;
+        push_dary_heap_great_great_grandparent<4>(heap[j].begin(), heap[j].end());
+        ASSERT_TRUE(is_dary_heap<4>(heap[j].begin(), heap[j].end()));
+    }
+}
+TEST(dary_heap, push_binary_heap_binary_search)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 1000);
+    std::vector<int> heap;
+    int num = 10000;
+    heap.reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        heap.push_back(distribution(randomness));
+
+        //push_binary_heap_binary_search(heap.begin(), heap.end());
+        push_binary_heap_binary_search(heap.data(), heap.data() + heap.size());
+        if (!is_dary_heap<2>(heap.begin(), heap.end()))
+            std::cout << i << std::endl;
+        ASSERT_TRUE(is_dary_heap<2>(heap.begin(), heap.end()));
+        ASSERT_TRUE(std::is_heap(heap.begin(), heap.end()));
+    }
+}
+TEST(dary_heap, push_binary_heap_binary_search_plus_one)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 1000);
+    std::vector<int> heap;
+    int num = 10000;
+    heap.reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        heap.push_back(distribution(randomness));
+
+        push_binary_heap_binary_search_plus_one(heap.begin(), heap.end());
+        ASSERT_TRUE(is_dary_heap<2>(heap.begin(), heap.end()));
+        ASSERT_TRUE(std::is_heap(heap.begin(), heap.end()));
+    }
+}
+struct CountingComparer
+{
+    static std::atomic<size_t> num_comparisons;
+
+    template<typename T, typename U>
+    bool operator()(const T & l, const U & r) const
+    {
+        num_comparisons.fetch_add(1, std::memory_order_relaxed);
+        return l < r;
+    }
+};
+std::atomic<size_t> CountingComparer::num_comparisons{0};
+
+TEST(dary_heap, DISABLED_push_count)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 1000);
+    std::vector<int> heap;
+    int num = 10000;
+    heap.reserve(num);
+    std::vector<size_t> comparison_counts;
+    for (int i = 0; i < num; ++i)
+    {
+        heap.push_back(distribution(randomness));
+
+        size_t num_comparisons_before = CountingComparer::num_comparisons.load(std::memory_order_relaxed);
+        push_dary_heap<2>(heap.begin(), heap.end(), CountingComparer());
+        size_t num_comparisons = CountingComparer::num_comparisons.load(std::memory_order_relaxed) - num_comparisons_before;
+        if (num_comparisons >= comparison_counts.size())
+            comparison_counts.resize(num_comparisons + 1);
+        ++comparison_counts[num_comparisons];
+    }
+    for (size_t i = 0; i < comparison_counts.size(); ++i)
+    {
+        std::cout << i << ": " << comparison_counts[i] << std::endl;
+    }
+}
+TEST(dary_heap, DISABLED_push_count_one_only)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 1000);
+    std::vector<int> heap;
+    int num = 16383;
+    heap.reserve(num);
+    std::vector<size_t> comparison_counts;
+    for (int i = 0; i < num; ++i)
+    {
+        heap.push_back(distribution(randomness));
+    }
+    for (int i = 0; i < num; ++i)
+    {
+        std::shuffle(heap.begin(), heap.end(), randomness);
+        make_dary_heap<2>(heap.begin(), heap.end() - 1);
+        size_t num_comparisons_before = CountingComparer::num_comparisons.load(std::memory_order_relaxed);
+        push_dary_heap<2>(heap.begin(), heap.end(), CountingComparer());
+        size_t num_comparisons = CountingComparer::num_comparisons.load(std::memory_order_relaxed) - num_comparisons_before;
+        if (num_comparisons >= comparison_counts.size())
+            comparison_counts.resize(num_comparisons + 1);
+        ++comparison_counts[num_comparisons];
+    }
+    for (size_t i = 0; i < comparison_counts.size(); ++i)
+    {
+        std::cout << i << ": " << comparison_counts[i] << std::endl;
     }
 }
 TEST(dary_heap, pop_dary_heap)
@@ -568,11 +735,524 @@ TEST(dary_heap, pop_dary_heap)
     }
 }
 
+TEST(dary_heap, pop_binary_heap_grandparent)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 100);
+    std::vector<int> heap;
+    int num = 100;
+    heap.reserve(num);
+    std::vector<int> sorted;
+    sorted.reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        int to_push = distribution(randomness);
+        heap.push_back(to_push);
+        sorted.push_back(to_push);
+    }
+    std::sort(sorted.begin(), sorted.end());
+    make_dary_heap<2>(heap.begin(), heap.end());
+    for (int i = 0; i < num; ++i)
+    {
+        pop_binary_heap_grandparent(heap.begin(), heap.end() - i);
+        ASSERT_TRUE(is_dary_heap<2>(heap.begin(), heap.end() - i - 1));
+        ASSERT_TRUE(std::is_heap(heap.begin(), heap.end() - i - 1));
+    }
+    ASSERT_EQ(sorted, heap);
+}
+TEST(dary_heap, pop_binary_heap_unrolled_grandparent)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 1000);
+    std::vector<int> heap;
+    int num = 10000;
+    heap.reserve(num);
+    std::vector<int> sorted;
+    sorted.reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        int to_push = distribution(randomness);
+        heap.push_back(to_push);
+        sorted.push_back(to_push);
+    }
+    std::sort(sorted.begin(), sorted.end());
+    make_dary_heap<2>(heap.begin(), heap.end());
+    for (int i = 0; i < num; ++i)
+    {
+        pop_binary_heap_unrolled_grandparent(heap.begin(), heap.end() - i);
+        ASSERT_TRUE(is_dary_heap<2>(heap.begin(), heap.end() - i - 1));
+        ASSERT_TRUE(std::is_heap(heap.begin(), heap.end() - i - 1));
+    }
+    ASSERT_EQ(sorted, heap);
+}
+TEST(dary_heap, pop_quaternary_heap_grandparent)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 100);
+    std::vector<int> heap;
+    int num = 100;
+    heap.reserve(num);
+    std::vector<int> sorted;
+    sorted.reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        int to_push = distribution(randomness);
+        heap.push_back(to_push);
+        sorted.push_back(to_push);
+    }
+    std::sort(sorted.begin(), sorted.end());
+    make_dary_heap<4>(heap.begin(), heap.end());
+    for (int i = 0; i < num; ++i)
+    {
+        pop_quaternary_heap_grandparent(heap.begin(), heap.end() - i);
+        ASSERT_TRUE(is_dary_heap<4>(heap.begin(), heap.end() - i - 1));
+    }
+    ASSERT_EQ(sorted, heap);
+}
+
+TEST(dary_heap, pop_binary_heap_unrolled)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 100);
+    std::vector<int> heap;
+    std::vector<int> sorted;
+    int num = 100;
+    heap.reserve(num);
+    sorted.reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        int to_push = distribution(randomness);
+        heap.push_back(to_push);
+        sorted.push_back(to_push);
+    }
+    std::sort(sorted.begin(), sorted.end());
+    make_dary_heap<2>(heap.begin(), heap.end());
+    for (int i = 0; i < num; ++i)
+    {
+        pop_binary_heap_unrolled(heap.begin(), heap.end() - i);
+        ASSERT_TRUE(is_dary_heap<2>(heap.begin(), heap.end() - i - 1));
+        ASSERT_TRUE(std::is_heap(heap.begin(), heap.end() - i - 1));
+    }
+    ASSERT_EQ(sorted, heap);
+}
+
+TEST(dary_heap, pop_binary_heap_unrolled_8)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 100);
+    std::vector<int> heap;
+    int num = 100;
+    heap.reserve(num);
+    std::vector<int> sorted;
+    sorted.reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        int to_push = distribution(randomness);
+        heap.push_back(to_push);
+        sorted.push_back(to_push);
+    }
+    std::sort(sorted.begin(), sorted.end());
+    make_dary_heap<2>(heap.begin(), heap.end());
+    for (int i = 0; i < num; ++i)
+    {
+        pop_binary_heap_unrolled_8(heap.begin(), heap.end() - i);
+        ASSERT_TRUE(is_dary_heap<2>(heap.begin(), heap.end() - i - 1));
+        ASSERT_TRUE(std::is_heap(heap.begin(), heap.end() - i - 1));
+    }
+    ASSERT_EQ(sorted, heap);
+}
+
+TEST(dary_heap, pop_binary_heap_unrolled_2)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 100);
+    std::vector<int> heap;
+    int num = 100;
+    heap.reserve(num);
+    std::vector<int> sorted;
+    sorted.reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        int to_push = distribution(randomness);
+        heap.push_back(to_push);
+        sorted.push_back(to_push);
+    }
+    std::sort(sorted.begin(), sorted.end());
+    make_dary_heap<2>(heap.begin(), heap.end());
+    for (int i = 0; i < num; ++i)
+    {
+        pop_binary_heap_unrolled_2(heap.begin(), heap.end() - i);
+        ASSERT_TRUE(is_dary_heap<2>(heap.begin(), heap.end() - i - 1));
+        ASSERT_TRUE(std::is_heap(heap.begin(), heap.end() - i - 1));
+    }
+    ASSERT_EQ(sorted, heap);
+}
+
+TEST(dary_heap, pop_binary_heap_unrolled_no_early_out)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 100);
+    std::vector<int> heap;
+    int num = 100;
+    heap.reserve(num);
+    std::vector<int> sorted;
+    sorted.reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        int to_push = distribution(randomness);
+        heap.push_back(to_push);
+        sorted.push_back(to_push);
+    }
+    std::sort(sorted.begin(), sorted.end());
+    make_dary_heap<2>(heap.begin(), heap.end());
+    for (int i = 0; i < num; ++i)
+    {
+        pop_binary_heap_unrolled_no_early_out(heap.begin(), heap.end() - i);
+        ASSERT_TRUE(is_dary_heap<2>(heap.begin(), heap.end() - i - 1));
+        ASSERT_TRUE(std::is_heap(heap.begin(), heap.end() - i - 1));
+    }
+    ASSERT_EQ(sorted, heap);
+}
+
+TEST(dary_heap, pop_quaternary_heap_unrolled)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 1000);
+    std::vector<int> heap;
+    int num = 10000;
+    heap.reserve(num);
+    std::vector<int> sorted;
+    sorted.reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        int to_push = distribution(randomness);
+        heap.push_back(to_push);
+        sorted.push_back(to_push);
+    }
+    std::sort(sorted.begin(), sorted.end());
+    make_dary_heap<4>(heap.begin(), heap.end());
+    for (int i = 0; i < num; ++i)
+    {
+        pop_quaternary_heap_unrolled(heap.begin(), heap.end() - i);
+        ASSERT_TRUE(is_dary_heap<4>(heap.begin(), heap.end() - i - 1));
+    }
+    ASSERT_EQ(sorted, heap);
+}
+
+TEST(dary_heap, pop_quaternary_heap_unrolled_2)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 1000);
+    std::vector<int> heap;
+    int num = 10000;
+    heap.reserve(num);
+    std::vector<int> sorted;
+    sorted.reserve(num);
+    for (int i = 0; i < num; ++i)
+    {
+        int to_push = distribution(randomness);
+        heap.push_back(to_push);
+        sorted.push_back(to_push);
+    }
+    std::sort(sorted.begin(), sorted.end());
+    make_dary_heap<4>(heap.begin(), heap.end());
+    for (int i = 0; i < num; ++i)
+    {
+        pop_quaternary_heap_unrolled_2(heap.begin(), heap.end() - i);
+        ASSERT_TRUE(is_dary_heap<4>(heap.begin(), heap.end() - i - 1));
+    }
+    ASSERT_EQ(sorted, heap);
+}
+
+TEST(pairing_heap, sort)
+{
+    std::vector<int> input = { 5, 3, 10, 2, 1, -1 };
+    PairingHeap<int>::MemoryPool pool;
+    PairingHeap<int> heap;
+    for (int i : input)
+        heap.insert(i, pool);
+    std::vector<int> sorted;
+    sorted.reserve(input.size());
+    ASSERT_TRUE(pool.empty());
+    while (!heap.empty())
+    {
+        sorted.push_back(heap.min());
+        heap.delete_min(pool);
+    }
+    ASSERT_EQ(input.size(), sorted.size());
+    ASSERT_TRUE(std::is_sorted(sorted.begin(), sorted.end()));
+    ASSERT_TRUE(std::is_permutation(input.begin(), input.end(), sorted.begin(), sorted.end()));
+    heap.clear(pool);
+    ASSERT_TRUE(heap.empty());
+
+    for (int i : input)
+    {
+        ASSERT_FALSE(pool.empty());
+        heap.insert(i, pool);
+    }
+    ASSERT_TRUE(pool.empty());
+}
+
+TEST(pairing_heap, pop_bigger)
+{
+    std::vector<int> input;
+    input.reserve(100);
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 100);
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+    PairingHeap<int>::MemoryPool pool;
+    PairingHeap<int> heap;
+    for (int i : input)
+        heap.insert(i, pool);
+    std::vector<int> sorted;
+    sorted.reserve(input.size());
+    ASSERT_TRUE(pool.empty());
+    while (!heap.empty())
+    {
+        sorted.push_back(heap.min());
+        heap.delete_min(pool);
+    }
+    std::sort(input.begin(), input.end());
+    ASSERT_EQ(input, sorted);
+}
+
+namespace
+{
+struct PointerLess
+{
+    template<typename T>
+    bool operator()(const std::unique_ptr<T> & l, const std::unique_ptr<T> & r) const
+    {
+        return *l < *r;
+    }
+};
+}
+TEST(pairing_heap, no_copies)
+{
+    std::vector<int> input = { 5, 3, 10, 2, 1, -1 };
+    PairingHeap<std::unique_ptr<int>, PointerLess>::MemoryPool pool;
+    PairingHeap<std::unique_ptr<int>, PointerLess> heap;
+    for (int i : input)
+        heap.insert(std::make_unique<int>(i), pool);
+    std::vector<int> sorted;
+    sorted.reserve(input.size());
+    while (!heap.empty())
+    {
+        sorted.push_back(*heap.min());
+        heap.delete_min(pool);
+    }
+    ASSERT_EQ(input.size(), sorted.size());
+    ASSERT_TRUE(std::is_sorted(sorted.begin(), sorted.end()));
+    ASSERT_TRUE(std::is_permutation(input.begin(), input.end(), sorted.begin(), sorted.end()));
+}
+
+TEST(pairing_heap, meld)
+{
+    std::vector<int> input_a = { 5, 3, 10, 2, 1, -1 };
+    std::vector<int> input_b = { 2, 3, 4, 5, 10, 1, -2 };
+    PairingHeap<int>::MemoryPool pool;
+    PairingHeap<int> heap_a;
+    PairingHeap<int> heap_b;
+    for (int i : input_a)
+        heap_a.insert(i, pool);
+    for (int i : input_b)
+        heap_b.insert(i, pool);
+    std::vector<int> sorted;
+    sorted.reserve(input_a.size() + input_b.size());
+    ASSERT_TRUE(pool.empty());
+    heap_a.meld(std::move(heap_b));
+    ASSERT_TRUE(heap_b.empty());
+    while (!heap_a.empty())
+    {
+        sorted.push_back(heap_a.min());
+        heap_a.delete_min(pool);
+    }
+    std::vector<int> expected;
+    expected.reserve(input_a.size() + input_b.size());
+    expected.insert(expected.end(), input_a.begin(), input_a.end());
+    expected.insert(expected.end(), input_b.begin(), input_b.end());
+    std::sort(expected.begin(), expected.end());
+    ASSERT_EQ(expected, sorted);
+}
+
+TEST(pairing_pair_heap, sort)
+{
+    std::vector<int> input = { 5, 3, 10, 2, 1, -1 };
+    PairingHeapPair<int>::MemoryPool pool;
+    PairingHeapPair<int> heap;
+    for (int i : input)
+        heap.insert(i, pool);
+    std::vector<int> sorted;
+    sorted.reserve(input.size());
+    ASSERT_TRUE(pool.empty());
+    while (!heap.empty())
+    {
+        sorted.push_back(heap.min());
+        heap.delete_min(pool);
+    }
+    ASSERT_EQ(input.size(), sorted.size());
+    ASSERT_TRUE(std::is_sorted(sorted.begin(), sorted.end()));
+    ASSERT_TRUE(std::is_permutation(input.begin(), input.end(), sorted.begin(), sorted.end()));
+    heap.clear(pool);
+    ASSERT_TRUE(heap.empty());
+
+    for (int i : input)
+    {
+        ASSERT_FALSE(pool.empty());
+        heap.insert(i, pool);
+    }
+    ASSERT_TRUE(pool.empty());
+}
+
+TEST(pairing_pair_heap, sort_more)
+{
+    std::mt19937_64 randomness;
+    std::uniform_int_distribution<int> distribution(0, 100);
+    std::vector<int> input;
+    input.reserve(10000);
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+    PairingHeapPair<int>::MemoryPool pool;
+    PairingHeapPair<int> heap;
+    for (int i : input)
+        heap.insert(i, pool);
+    std::vector<int> sorted;
+    sorted.reserve(input.size());
+    ASSERT_TRUE(pool.empty());
+    while (!heap.empty())
+    {
+        sorted.push_back(heap.min());
+        heap.delete_min(pool);
+    }
+    ASSERT_EQ(input.size(), sorted.size());
+    ASSERT_TRUE(std::is_sorted(sorted.begin(), sorted.end()));
+    ASSERT_TRUE(std::is_permutation(input.begin(), input.end(), sorted.begin(), sorted.end()));
+    heap.clear(pool);
+    ASSERT_TRUE(heap.empty());
+
+    for (int i : input)
+    {
+        ASSERT_FALSE(pool.empty());
+        heap.insert(i, pool);
+    }
+    ASSERT_TRUE(pool.empty());
+}
+
+TEST(pairing_pair_heap, sort_more_loop)
+{
+    std::mt19937_64 randomness;
+    std::uniform_int_distribution<int> distribution(0, 100);
+    std::vector<int> input;
+    input.reserve(10000);
+    PairingHeapPair<int> heap;
+    PairingHeapPair<int>::MemoryPool pool;
+    for (int j = 0; j < 10; ++j)
+    {
+        input.clear();
+        while (input.size() != input.capacity())
+            input.push_back(distribution(randomness));
+        for (int i : input)
+            heap.insert(i, pool);
+        std::vector<int> sorted;
+        sorted.reserve(input.size());
+        ASSERT_TRUE(pool.empty());
+        while (!heap.empty())
+        {
+            sorted.push_back(heap.min());
+            heap.delete_min(pool);
+        }
+        ASSERT_EQ(input.size(), sorted.size());
+        ASSERT_TRUE(std::is_sorted(sorted.begin(), sorted.end()));
+        ASSERT_TRUE(std::is_permutation(input.begin(), input.end(), sorted.begin(), sorted.end()));
+        ASSERT_TRUE(heap.empty());
+    }
+
+    for (int i : input)
+    {
+        ASSERT_FALSE(pool.empty());
+        heap.insert(i, pool);
+    }
+    ASSERT_TRUE(pool.empty());
+}
+
+TEST(pairing_push_heap, sort_more)
+{
+    std::mt19937_64 randomness;
+    std::uniform_int_distribution<int> distribution(0, 100);
+    std::vector<int> input;
+    input.reserve(10000);
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+    PairingHeapMorePushWork<int, 4>::MemoryPool pool;
+    PairingHeapMorePushWork<int, 4> heap;
+    for (int i : input)
+        heap.insert(i, pool);
+    std::vector<int> sorted;
+    sorted.reserve(input.size());
+    ASSERT_TRUE(pool.empty());
+    while (!heap.empty())
+    {
+        sorted.push_back(heap.min());
+        heap.delete_min(pool);
+    }
+    ASSERT_EQ(input.size(), sorted.size());
+    ASSERT_TRUE(std::is_sorted(sorted.begin(), sorted.end()));
+    ASSERT_TRUE(std::is_permutation(input.begin(), input.end(), sorted.begin(), sorted.end()));
+    heap.clear(pool);
+    ASSERT_TRUE(heap.empty());
+
+    for (int i : input)
+    {
+        ASSERT_FALSE(pool.empty());
+        heap.insert(i, pool);
+    }
+    ASSERT_TRUE(pool.empty());
+}
+
+TEST(pairing_push_heap, sort_more_loop)
+{
+    std::mt19937_64 randomness;
+    std::uniform_int_distribution<int> distribution(0, 100);
+    std::vector<int> input;
+    input.reserve(10000);
+    PairingHeapMorePushWork<int, 4> heap;
+    PairingHeapMorePushWork<int, 4>::MemoryPool pool;
+    for (int j = 0; j < 10; ++j)
+    {
+        input.clear();
+        while (input.size() != input.capacity())
+            input.push_back(distribution(randomness));
+        for (int i : input)
+            heap.insert(i, pool);
+        std::vector<int> sorted;
+        sorted.reserve(input.size());
+        ASSERT_TRUE(pool.empty());
+        while (!heap.empty())
+        {
+            sorted.push_back(heap.min());
+            heap.delete_min(pool);
+        }
+        ASSERT_EQ(input.size(), sorted.size());
+        ASSERT_TRUE(std::is_sorted(sorted.begin(), sorted.end()));
+        ASSERT_TRUE(std::is_permutation(input.begin(), input.end(), sorted.begin(), sorted.end()));
+        ASSERT_TRUE(heap.empty());
+    }
+
+    for (int i : input)
+    {
+        ASSERT_FALSE(pool.empty());
+        heap.insert(i, pool);
+    }
+    ASSERT_TRUE(pool.empty());
+}
+
 #endif
 
 #include "custom_benchmark/custom_benchmark.h"
 #include "hashtable_benchmarks/benchmark_shared.hpp"
 #include <algorithm>
+#include <set>
 
 void benchmark_heap_push(skb::State & state)
 {
@@ -590,6 +1270,22 @@ void benchmark_heap_push(skb::State & state)
             std::push_heap(heap.begin(), heap.end());
         }
         skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+
+void benchmark_std_multiset_push(skb::State & state)
+{
+    std::multiset<int> heap;
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.insert(no_inline_random_number(distribution, randomness));
+        skb::DoNotOptimize(*heap.begin());
     }
     state.SetItemsProcessed(num_items * state.iterations());
 }
@@ -656,6 +1352,170 @@ void benchmark_push_dary_heap(skb::State & state)
     //CHECK_FOR_PROGRAMMER_ERROR(is_dary_heap<D>(heap.begin(), heap.end()));
 }
 
+template<int D>
+void benchmark_push_dary_heap_grandparent(skb::State & state)
+{
+    std::vector<int> heap;
+    int num_items = state.range(0);
+    heap.reserve(num_items);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+        {
+            heap.push_back(no_inline_random_number(distribution, randomness));
+            push_dary_heap_grandparent<D>(heap.begin(), heap.end());
+        }
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    //CHECK_FOR_PROGRAMMER_ERROR(is_dary_heap<D>(heap.begin(), heap.end()));
+}
+template<int D>
+void benchmark_push_dary_heap_great_grandparent(skb::State & state)
+{
+    std::vector<int> heap;
+    int num_items = state.range(0);
+    heap.reserve(num_items);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+        {
+            heap.push_back(no_inline_random_number(distribution, randomness));
+            push_dary_heap_great_grandparent<D>(heap.begin(), heap.end());
+        }
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(is_dary_heap<D>(heap.begin(), heap.end()));
+}
+template<int D>
+void benchmark_push_dary_heap_great_great_grandparent(skb::State & state)
+{
+    std::vector<int> heap;
+    int num_items = state.range(0);
+    heap.reserve(num_items);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+        {
+            heap.push_back(no_inline_random_number(distribution, randomness));
+            push_dary_heap_great_great_grandparent<D>(heap.begin(), heap.end());
+        }
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(is_dary_heap<D>(heap.begin(), heap.end()));
+}
+
+void benchmark_push_binary_heap_binary_search(skb::State & state)
+{
+    std::vector<int> heap;
+    int num_items = state.range(0);
+    heap.reserve(num_items);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+        {
+            heap.push_back(no_inline_random_number(distribution, randomness));
+            push_binary_heap_binary_search(heap.begin(), heap.end());
+        }
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(is_dary_heap<2>(heap.begin(), heap.end()));
+}
+
+void benchmark_push_binary_heap_binary_search_plus_one(skb::State & state)
+{
+    std::vector<int> heap;
+    int num_items = state.range(0);
+    heap.reserve(num_items);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+        {
+            heap.push_back(no_inline_random_number(distribution, randomness));
+            push_binary_heap_binary_search_plus_one(heap.begin(), heap.end());
+        }
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(is_dary_heap<2>(heap.begin(), heap.end()));
+}
+
+void benchmark_pairing_heap_push(skb::State & state)
+{
+    PairingHeap<int>::MemoryPool pool;
+    PairingHeap<int> heap;
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear(pool);
+        for (int i = 0; i < num_items; ++i)
+        {
+            heap.insert(no_inline_random_number(distribution, randomness), pool);
+        }
+        skb::DoNotOptimize(heap.min());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+
+void benchmark_pairing_pair_heap_push(skb::State & state)
+{
+    PairingHeapPair<int>::MemoryPool pool;
+    PairingHeapPair<int> heap;
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear(pool);
+        for (int i = 0; i < num_items; ++i)
+        {
+            heap.insert(no_inline_random_number(distribution, randomness), pool);
+        }
+        skb::DoNotOptimize(heap.min());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+
+template<size_t MergeInterval>
+void benchmark_pairing_push_heap_push(skb::State & state)
+{
+    typename PairingHeapMorePushWork<int, MergeInterval>::MemoryPool pool;
+    PairingHeapMorePushWork<int, MergeInterval> heap;
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear(pool);
+        for (int i = 0; i < num_items; ++i)
+        {
+            heap.insert(no_inline_random_number(distribution, randomness), pool);
+        }
+        skb::DoNotOptimize(heap.min());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+
 void benchmark_make_heap(skb::State & state)
 {
     std::vector<int> heap;
@@ -674,7 +1534,7 @@ void benchmark_make_heap(skb::State & state)
     state.SetItemsProcessed(num_items * state.iterations());
 }
 
-void benchmark_custom_make_heap(skb::State & state)
+void benchmark_make_interval_heap(skb::State & state)
 {
     std::vector<int> heap;
     int num_items = state.range(0);
@@ -686,11 +1546,10 @@ void benchmark_custom_make_heap(skb::State & state)
         heap.clear();
         for (int i = 0; i < num_items; ++i)
             heap.push_back(no_inline_random_number(distribution, randomness));
-        custom_make_heap(heap.begin(), heap.end());
+        interval_heap_make(heap.begin(), heap.end());
         skb::DoNotOptimize(heap.back());
     }
     state.SetItemsProcessed(num_items * state.iterations());
-    CHECK_FOR_PROGRAMMER_ERROR(std::is_heap(heap.begin(), heap.end()));
 }
 
 void benchmark_make_minmax_heap(skb::State & state)
@@ -791,6 +1650,76 @@ void benchmark_pop_heap(skb::State & state)
     state.SetItemsProcessed(num_items * state.iterations());
 }
 
+void benchmark_pop_std_multiset(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<std::multiset<int>> heaps;
+    static constexpr size_t max_memory_usage = 2 * 1024 * 1024 * size_t(1024);
+    static constexpr size_t memory_per_item = 4 * 8;
+    static constexpr size_t max_cached_items = max_memory_usage / memory_per_item;
+    int num_heaps = std::max(2, std::min(128, static_cast<int>(max_cached_items / num_items)));
+    heaps.reserve(num_heaps);
+    while (heaps.size() != heaps.capacity())
+    {
+        std::multiset<int> heap;
+        for (int i = 0; i < num_items; ++i)
+            heap.insert(no_inline_random_number(distribution, randomness));
+        heaps.push_back(std::move(heap));
+    }
+    std::uniform_int_distribution<int> random_heap(0, num_heaps - 1);
+    while (state.KeepRunning())
+    {
+        std::multiset<int> heap = heaps[no_inline_random_number(random_heap, randomness)];
+        skb::DoNotOptimize(*heap.begin());
+        for (int i = 0; i < num_items; ++i)
+            heap.erase(heap.begin());
+        skb::DoNotOptimize(heap.begin() == heap.end());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+
+void benchmark_pop_interval_heap_min(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        interval_heap_make(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            interval_heap_pop_min(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+
+void benchmark_pop_interval_heap_max(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        interval_heap_make(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            interval_heap_pop_max(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+
 template<int D>
 void benchmark_pop_dary_heap(skb::State & state)
 {
@@ -813,6 +1742,233 @@ void benchmark_pop_dary_heap(skb::State & state)
     CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
 }
 
+template<int D>
+void benchmark_pop_dary_heap_linear(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<D>(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_dary_heap_linear<D>(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
+}
+
+void benchmark_pop_binary_heap_grandparent(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<2>(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_binary_heap_grandparent(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
+}
+
+void benchmark_pop_quaternary_heap_grandparent(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<4>(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_quaternary_heap_grandparent(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
+}
+
+void benchmark_pop_binary_heap_unrolled(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<2>(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_binary_heap_unrolled(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
+}
+void benchmark_pop_binary_heap_unrolled_grandparent(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<2>(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_binary_heap_unrolled_grandparent(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
+}
+void benchmark_pop_binary_heap_unrolled_8(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<2>(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_binary_heap_unrolled_8(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
+}
+void benchmark_pop_binary_heap_unrolled_2(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<2>(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_binary_heap_unrolled_2(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
+}
+
+void benchmark_pop_binary_heap_unrolled_no_early_out(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<2>(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_binary_heap_unrolled_no_early_out(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
+}
+void benchmark_pop_quaternary_heap_unrolled(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<4>(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_quaternary_heap_unrolled(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
+}
+void benchmark_pop_quaternary_heap_unrolled_2(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<4>(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_quaternary_heap_unrolled_2(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+    CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
+}
+
+template<int D>
+void benchmark_pop_dary_heap_half(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<D>(heap.begin(), heap.end());
+        for (int i = 0; i < (num_items / 2); ++i)
+            pop_dary_heap<D>(heap.begin(), heap.end() - i);
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+
 void benchmark_pop_dary_heap_make_std_heap(skb::State & state)
 {
     int num_items = state.range(0);
@@ -832,6 +1988,83 @@ void benchmark_pop_dary_heap_make_std_heap(skb::State & state)
     }
     state.SetItemsProcessed(num_items * state.iterations());
     CHECK_FOR_PROGRAMMER_ERROR(std::is_sorted(heap.begin(), heap.end()));
+}
+
+void benchmark_pop_pairing_heap(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    PairingHeap<int> heap;
+    PairingHeap<int>::MemoryPool pool;
+    while (state.KeepRunning())
+    {
+        heap.clear(pool);
+        for (int i = 0; i < num_items; ++i)
+            heap.insert(no_inline_random_number(distribution, randomness), pool);
+        for (int i = 0; i < num_items; ++i)
+            heap.delete_min(pool);
+        skb::DoNotOptimize(heap.empty());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+
+void benchmark_pop_pairing_pair_heap(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    PairingHeapPair<int> heap;
+    PairingHeapPair<int>::MemoryPool pool;
+    while (state.KeepRunning())
+    {
+        heap.clear(pool);
+        for (int i = 0; i < num_items; ++i)
+            heap.insert(no_inline_random_number(distribution, randomness), pool);
+        for (int i = 0; i < num_items; ++i)
+            heap.delete_min(pool);
+        skb::DoNotOptimize(heap.empty());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+
+template<size_t MergeInterval>
+void benchmark_pop_pairing_push_heap(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    PairingHeapMorePushWork<int, MergeInterval> heap;
+    typename PairingHeapMorePushWork<int, MergeInterval>::MemoryPool pool;
+    while (state.KeepRunning())
+    {
+        heap.clear(pool);
+        for (int i = 0; i < num_items; ++i)
+            heap.insert(no_inline_random_number(distribution, randomness), pool);
+        for (int i = 0; i < num_items; ++i)
+            heap.delete_min(pool);
+        skb::DoNotOptimize(heap.empty());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+
+void benchmark_pop_pairing_heap_half(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    PairingHeap<int> heap;
+    PairingHeap<int>::MemoryPool pool;
+    while (state.KeepRunning())
+    {
+        heap.clear(pool);
+        for (int i = 0; i < num_items; ++i)
+            heap.insert(no_inline_random_number(distribution, randomness), pool);
+        for (int i = 0; i < (num_items / 2); ++i)
+            heap.delete_min(pool);
+        skb::DoNotOptimize(heap.min());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
 }
 
 void benchmark_heap_baseline(skb::State & state)
@@ -867,6 +2100,34 @@ void benchmark_make_heap_baseline(skb::State & state)
 }
 SKA_BENCHMARK("baseline", benchmark_make_heap_baseline);
 
+void benchmark_copy_std_multiset_baseline(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<std::multiset<int>> heaps;
+    static constexpr size_t max_memory_usage = 2 * 1024 * 1024 * size_t(1024);
+    static constexpr size_t memory_per_item = 4 * 8;
+    static constexpr size_t max_cached_items = max_memory_usage / memory_per_item;
+    int num_heaps = std::max(2, std::min(128, static_cast<int>(max_cached_items / num_items)));
+    heaps.reserve(num_heaps);
+    while (heaps.size() != heaps.capacity())
+    {
+        std::multiset<int> heap;
+        for (int i = 0; i < num_items; ++i)
+            heap.insert(no_inline_random_number(distribution, randomness));
+        heaps.push_back(std::move(heap));
+    }
+    std::uniform_int_distribution<int> random_heap(0, num_heaps - 1);
+    while (state.KeepRunning())
+    {
+        std::multiset<int> heap = heaps[no_inline_random_number(random_heap, randomness)];
+        skb::DoNotOptimize(*heap.begin());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+SKA_BENCHMARK("baseline", benchmark_copy_std_multiset_baseline);
+
 void benchmark_make_minmax_heap_baseline(skb::State & state)
 {
     int num_items = state.range(0);
@@ -885,6 +2146,79 @@ void benchmark_make_minmax_heap_baseline(skb::State & state)
     state.SetItemsProcessed(num_items * state.iterations());
 }
 SKA_BENCHMARK("baseline", benchmark_make_minmax_heap_baseline);
+
+void benchmark_make_interval_heap_baseline(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        interval_heap_make(heap.begin(), heap.end());
+        skb::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+SKA_BENCHMARK("baseline", benchmark_make_interval_heap_baseline);
+
+void benchmark_make_pairing_heap_baseline(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    PairingHeap<int> heap;
+    PairingHeap<int>::MemoryPool pool;
+    while (state.KeepRunning())
+    {
+        heap.clear(pool);
+        for (int i = 0; i < num_items; ++i)
+            heap.insert(no_inline_random_number(distribution, randomness), pool);
+        skb::DoNotOptimize(heap.min());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+SKA_BENCHMARK("baseline", benchmark_make_pairing_heap_baseline);
+
+void benchmark_make_pairing_pair_heap_baseline(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    PairingHeapPair<int> heap;
+    PairingHeapPair<int>::MemoryPool pool;
+    while (state.KeepRunning())
+    {
+        heap.clear(pool);
+        for (int i = 0; i < num_items; ++i)
+            heap.insert(no_inline_random_number(distribution, randomness), pool);
+        skb::DoNotOptimize(heap.min());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+SKA_BENCHMARK("baseline", benchmark_make_pairing_pair_heap_baseline);
+
+template<size_t MergeInterval>
+void benchmark_make_pairing_push_heap_baseline(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    PairingHeapMorePushWork<int, MergeInterval> heap;
+    typename PairingHeapMorePushWork<int, MergeInterval>::MemoryPool pool;
+    while (state.KeepRunning())
+    {
+        heap.clear(pool);
+        for (int i = 0; i < num_items; ++i)
+            heap.insert(no_inline_random_number(distribution, randomness), pool);
+        skb::DoNotOptimize(heap.min());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
 
 template<int D>
 void benchmark_make_dary_heap_baseline(skb::State & state)
@@ -905,9 +2239,209 @@ void benchmark_make_dary_heap_baseline(skb::State & state)
     state.SetItemsProcessed(num_items * state.iterations());
 }
 
+template<typename It, typename Compare>
+It min_element_four(It begin, It end, Compare && compare)
+{
+    size_t size = end - begin;
+    if (!size)
+        return end;
+    size_t num_loops = (size - 1) / 4;
+    It smallest = begin;
+    ++begin;
+    for (; num_loops > 0; --num_loops)
+    {
+        It min_first_half = begin + !!compare(begin[1], begin[0]);
+        It min_second_half = begin + 2 + !!compare(begin[3], begin[2]);
+        It min_four = compare(*min_second_half, *min_first_half) ? min_second_half : min_first_half;
+        if (compare(*min_four, *smallest))
+            smallest = min_four;
+        begin += 4;
+    }
+    for (; begin != end; ++begin)
+    {
+        if (compare(*begin, *smallest))
+            smallest = begin;
+    }
+    return smallest;
+}
+
+template<typename It>
+It min_element_four(It begin, It end)
+{
+    return min_element_four(begin, end, std::less<>{});
+}
+template<typename It, typename Compare>
+It min_element_four_branchy(It begin, It end, Compare && compare)
+{
+    size_t size = end - begin;
+    if (!size)
+        return end;
+    size_t num_loops = (size - 1) / 4;
+    It smallest = begin;
+    ++begin;
+    for (; num_loops > 0; --num_loops)
+    {
+        It min_first_half = compare(begin[1], begin[0]) ? begin + 1 : begin;
+        It min_second_half = compare(begin[3], begin[2]) ? begin + 3 : begin + 2;
+        It min_four = compare(*min_second_half, *min_first_half) ? min_second_half : min_first_half;
+        if (compare(*min_four, *smallest))
+            smallest = min_four;
+        begin += 4;
+    }
+    for (; begin != end; ++begin)
+    {
+        if (compare(*begin, *smallest))
+            smallest = begin;
+    }
+    return smallest;
+}
+
+template<typename It>
+It min_element_four_branchy(It begin, It end)
+{
+    return min_element_four_branchy(begin, end, std::less<>{});
+}
+template<typename It, typename Compare>
+It min_element_four_parallel(It begin, It end, Compare && compare)
+{
+    size_t size = end - begin;
+    if (!size)
+        return end;
+    size_t num_loops = size / 4;
+    It smallest0 = begin;
+    ++begin;
+    if (num_loops)
+    {
+        It smallest1 = begin;
+        It smallest2 = begin + 1;
+        It smallest3 = begin + 2;
+        begin += 3;
+        for (--num_loops; num_loops > 0; --num_loops)
+        {
+            if (compare(begin[0], *smallest0))
+                smallest0 = begin;
+            if (compare(begin[1], *smallest1))
+                smallest1 = begin + 1;
+            if (compare(begin[2], *smallest2))
+                smallest2 = begin + 2;
+            if (compare(begin[3], *smallest3))
+                smallest3 = begin + 3;
+            begin += 4;
+        }
+        if (compare(*smallest3, *smallest2))
+            smallest2 = smallest3;
+        if (compare(*smallest1, *smallest0))
+            smallest0 = smallest1;
+        if (compare(*smallest2, *smallest0))
+            smallest0 = smallest2;
+    }
+    for (; begin != end; ++begin)
+    {
+        if (compare(*begin, *smallest0))
+            smallest0 = begin;
+    }
+    return smallest0;
+}
+
+template<typename It>
+It min_element_four_parallel(It begin, It end)
+{
+    return min_element_four_parallel(begin, end, std::less<>{});
+}
+
+TEST(min_element_four_heap, cases)
+{
+    std::vector<int> input = { 1, 2, 3, 4, 5, 6 };
+    ASSERT_EQ(1, *min_element_four(input.begin(), input.end()));
+    input = { 1, 2, 3, 4, 5, 6, 0 };
+    ASSERT_EQ(0, *min_element_four(input.begin(), input.end()));
+    input = { 1, 2, 3, 4, -1, 5, 6, 0 };
+    ASSERT_EQ(-1, *min_element_four(input.begin(), input.end()));
+    input = { 1, 2, 3, 4, -1, 5, 6, -2, 0 };
+    ASSERT_EQ(-2, *min_element_four(input.begin(), input.end()));
+}
+TEST(min_element_four_heap, parallel_cases)
+{
+    std::vector<int> input = { 1, 2, 3 };
+    ASSERT_EQ(1, *min_element_four_parallel(input.begin(), input.end()));
+    input = { 1, 2, 3, 0 };
+    ASSERT_EQ(0, *min_element_four_parallel(input.begin(), input.end()));
+    input = { 1, 2, 3, 4, -1, 5, 6, 0 };
+    ASSERT_EQ(-1, *min_element_four_parallel(input.begin(), input.end()));
+    input = { 1, 2, 3, 4, -1, 5, 6, -2, 0 };
+    ASSERT_EQ(-2, *min_element_four_parallel(input.begin(), input.end()));
+}
+
+void benchmark_min_element(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> data;
+    data.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        data.clear();
+        for (int i = 0; i < num_items; ++i)
+            data.push_back(no_inline_random_number(distribution, randomness));
+        skb::DoNotOptimize(*std::min_element(data.begin(), data.end()));
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+
+void benchmark_min_element_four(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> data;
+    data.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        data.clear();
+        for (int i = 0; i < num_items; ++i)
+            data.push_back(no_inline_random_number(distribution, randomness));
+        skb::DoNotOptimize(*min_element_four(data.begin(), data.end()));
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+
+void benchmark_min_element_branchy(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> data;
+    data.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        data.clear();
+        for (int i = 0; i < num_items; ++i)
+            data.push_back(no_inline_random_number(distribution, randomness));
+        skb::DoNotOptimize(*min_element_four_branchy(data.begin(), data.end()));
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+void benchmark_min_element_parallel(skb::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> data;
+    data.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        data.clear();
+        for (int i = 0; i < num_items; ++i)
+            data.push_back(no_inline_random_number(distribution, randomness));
+        skb::DoNotOptimize(*min_element_four_parallel(data.begin(), data.end()));
+    }
+    state.SetItemsProcessed(state.iterations() * num_items);
+}
+
 skb::Benchmark * SetHeapRange(skb::Benchmark * bm)
 {
-    return bm->SetRange(4, 1024*1024*1024)->SetRangeMultiplier(std::sqrt(2.0));
+    return bm->SetRange(4, 1024*1024*1024)->SetRangeMultiplier(std::pow(2.0, 0.25));
 }
 
 void RegisterHeapBenchmarks()
@@ -924,6 +2458,7 @@ void RegisterHeapBenchmarks()
     {
         skb::CategoryBuilder push = builder.AddCategory("operation", "push");
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_heap_push, push.BuildCategories("heap", "std::heap"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_std_multiset_push, push.BuildCategories("heap", "std::multiset"))->SetBaseline("benchmark_heap_baseline"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_minmax_heap_push, push.BuildCategories("heap", "minmax_heap"))->SetBaseline("benchmark_heap_baseline"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_interval_heap_push, push.BuildCategories("heap", "interval_heap"))->SetBaseline("benchmark_heap_baseline"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap<2>, push.AddCategory("dary_heap d", "2").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_heap_baseline"));
@@ -932,11 +2467,28 @@ void RegisterHeapBenchmarks()
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap<5>, push.AddCategory("dary_heap d", "5").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_heap_baseline"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap<6>, push.AddCategory("dary_heap d", "6").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_heap_baseline"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap<8>, push.AddCategory("dary_heap d", "8").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap_grandparent<2>, push.AddCategory("dary_heap d", "2").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap_grandparent<3>, push.AddCategory("dary_heap d", "3").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap_grandparent<4>, push.AddCategory("dary_heap d", "4").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap_grandparent<5>, push.AddCategory("dary_heap d", "5").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap_grandparent<6>, push.AddCategory("dary_heap d", "6").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap_grandparent<8>, push.AddCategory("dary_heap d", "8").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap_great_grandparent<2>, push.AddCategory("dary_heap d", "2").AddCategory("grandparent", "great").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap_great_grandparent<4>, push.AddCategory("dary_heap d", "4").AddCategory("grandparent", "great").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap_great_great_grandparent<2>, push.AddCategory("dary_heap d", "2").AddCategory("grandparent", "great_great").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_dary_heap_great_great_grandparent<4>, push.AddCategory("dary_heap d", "4").AddCategory("grandparent", "great_great").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_binary_heap_binary_search, push.AddCategory("dary_heap d", "2").AddCategory("grandparent", "binary").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_push_binary_heap_binary_search_plus_one, push.AddCategory("dary_heap d", "2").AddCategory("grandparent", "binary+1").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pairing_heap_push, push.BuildCategories("heap", "pairing_heap"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pairing_pair_heap_push, push.BuildCategories("heap", "pairing_heap_pair"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pairing_push_heap_push<4>, push.AddCategory("merge interval", "4").BuildCategories("heap", "pairing_heap_push"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pairing_push_heap_push<8>, push.AddCategory("merge interval", "8").BuildCategories("heap", "pairing_heap_push"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pairing_push_heap_push<16>, push.AddCategory("merge interval", "16").BuildCategories("heap", "pairing_heap_push"))->SetBaseline("benchmark_heap_baseline"));
     }
     {
         skb::CategoryBuilder make = builder.AddCategory("operation", "make");
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_make_heap, make.BuildCategories("heap", "std::heap"))->SetBaseline("benchmark_heap_baseline"));
-        //SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_custom_make_heap, make.BuildCategories("heap", "custom_make_heap"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_make_interval_heap, make.BuildCategories("heap", "interval_heap"))->SetBaseline("benchmark_heap_baseline"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_make_minmax_heap, make.BuildCategories("heap", "minmax_heap"))->SetBaseline("benchmark_heap_baseline"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_make_dary_heap<2>, make.AddCategory("dary_heap d", "2").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_heap_baseline"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_make_dary_heap<3>, make.AddCategory("dary_heap d", "3").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_heap_baseline"));
@@ -949,14 +2501,46 @@ void RegisterHeapBenchmarks()
         skb::CategoryBuilder pop = builder.AddCategory("operation", "pop");
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_minmax_heap_min, pop.AddCategory("minmax pop", "min").BuildCategories("heap", "minmax_heap"))->SetBaseline("benchmark_make_minmax_heap_baseline"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_minmax_heap_max, pop.AddCategory("minmax pop", "max").BuildCategories("heap", "minmax_heap"))->SetBaseline("benchmark_make_minmax_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_interval_heap_min, pop.AddCategory("minmax pop", "min").BuildCategories("heap", "interval_heap"))->SetBaseline("benchmark_make_interval_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_interval_heap_max, pop.AddCategory("minmax pop", "max").BuildCategories("heap", "interval_heap"))->SetBaseline("benchmark_make_interval_heap_baseline"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_heap, pop.BuildCategories("heap", "std::heap"))->SetBaseline("benchmark_make_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_std_multiset, pop.BuildCategories("heap", "std::multiset"))->SetBaseline("benchmark_copy_std_multiset_baseline"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_dary_heap<2>, pop.AddCategory("dary_heap d", "2").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_2"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_dary_heap<3>, pop.AddCategory("dary_heap d", "3").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_3"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_dary_heap<4>, pop.AddCategory("dary_heap d", "4").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_4"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_dary_heap_linear<4>, pop.AddCategory("dary_heap d", "4").AddCategory("compare", "linear").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_4"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_dary_heap<5>, pop.AddCategory("dary_heap d", "5").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_5"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_dary_heap<6>, pop.AddCategory("dary_heap d", "6").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_6"));
         SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_dary_heap<8>, pop.AddCategory("dary_heap d", "8").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_8"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_dary_heap_linear<8>, pop.AddCategory("dary_heap d", "8").AddCategory("compare", "linear").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_8"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_binary_heap_grandparent, pop.AddCategory("dary_heap d", "2").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_make_dary_heap_baseline_2"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_quaternary_heap_grandparent, pop.AddCategory("dary_heap d", "4").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_make_dary_heap_baseline_4"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_binary_heap_unrolled, pop.AddCategory("dary_heap d", "2").AddCategory("unrolled", "with_early_out").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_2"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_binary_heap_unrolled_grandparent, pop.AddCategory("dary_heap d", "2").AddCategory("unrolled", "with_early_out").BuildCategories("heap", "dary_heap_grandparent"))->SetBaseline("benchmark_make_dary_heap_baseline_2"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_binary_heap_unrolled_8, pop.AddCategory("dary_heap d", "2").AddCategory("unrolled", "with_early_out_8").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_2"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_binary_heap_unrolled_2, pop.AddCategory("dary_heap d", "2").AddCategory("unrolled", "with_early_out_2").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_2"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_binary_heap_unrolled_no_early_out, pop.AddCategory("dary_heap d", "2").AddCategory("unrolled", "no_early_out").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_2"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_quaternary_heap_unrolled, pop.AddCategory("dary_heap d", "4").AddCategory("unrolled", "with_early_out").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_4"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_quaternary_heap_unrolled_2, pop.AddCategory("dary_heap d", "4").AddCategory("unrolled", "with_early_out_2").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_make_dary_heap_baseline_4"));
         //SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_dary_heap_make_std_heap, pop.AddCategory("dary_heap d", "2").BuildCategories("heap", "pop_dary_heap_make_std_heap"))->SetBaseline("benchmark_make_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_pairing_heap, pop.BuildCategories("heap", "pairing_heap"))->SetBaseline("benchmark_make_pairing_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_pairing_pair_heap, pop.BuildCategories("heap", "pairing_heap_pair"))->SetBaseline("benchmark_make_pairing_pair_heap_baseline"));
+        SKA_BENCHMARK_NAME(&benchmark_make_pairing_push_heap_baseline<4>, "baseline", "benchmark_make_pairing_push_heap_baseline_4");
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_pairing_push_heap<4>, pop.AddCategory("merge interval", "4").BuildCategories("heap", "pairing_heap_push"))->SetBaseline("benchmark_make_pairing_push_heap_baseline_4"));
+        SKA_BENCHMARK_NAME(&benchmark_make_pairing_push_heap_baseline<8>, "baseline", "benchmark_make_pairing_push_heap_baseline_8");
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_pairing_push_heap<8>, pop.AddCategory("merge interval", "8").BuildCategories("heap", "pairing_heap_push"))->SetBaseline("benchmark_make_pairing_push_heap_baseline_8"));
+        SKA_BENCHMARK_NAME(&benchmark_make_pairing_push_heap_baseline<16>, "baseline", "benchmark_make_pairing_push_heap_baseline_16");
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_pairing_push_heap<16>, pop.AddCategory("merge interval", "16").BuildCategories("heap", "pairing_heap_push"))->SetBaseline("benchmark_make_pairing_push_heap_baseline_16"));
+        skb::CategoryBuilder pop_half = builder.AddCategory("operation", "pop_half");
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_dary_heap_half<2>, pop_half.AddCategory("dary_heap d", "2").BuildCategories("heap", "dary_heap"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_pop_pairing_heap_half, pop_half.BuildCategories("heap", "pairing_heap"))->SetBaseline("benchmark_heap_baseline"));
+    }
+    {
+        skb::CategoryBuilder min_element = builder.AddCategory("instruction", "min_element");
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_min_element, min_element.BuildCategories("instructions", "min_element"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_min_element_four, min_element.BuildCategories("instructions", "min_element_four"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_min_element_branchy, min_element.BuildCategories("instructions", "min_element_branchy"))->SetBaseline("benchmark_heap_baseline"));
+        SetHeapRange(SKA_BENCHMARK_CATEGORIES(&benchmark_min_element_parallel, min_element.BuildCategories("instructions", "min_element_parallel"))->SetBaseline("benchmark_heap_baseline"));
     }
 }
 
@@ -1086,6 +2670,340 @@ void skbenchmark_ocaml_multiply(skb::State & state)
     state.SetItemsProcessed(num_multiplies * state.iterations());
 }
 
+template<typename It>
+size_t find_index_with_end(It begin, It end, int to_find)
+{
+    size_t num_items = end - begin;
+    for (size_t i = 0; i != num_items; ++i)
+    {
+        if (begin[i] == to_find)
+            return i;
+    }
+    return size_t(-1);
+}
+template<typename It>
+size_t find_index_no_bounds_checking(It begin, It end, int to_find)
+{
+    if (begin == end)
+        return size_t(-1);
+    int last = end[-1];
+    size_t last_index = (end - begin) - 1;
+    if (to_find == last)
+        return last_index;
+    end[-1] = to_find;
+    size_t i = 0;
+    for (;; ++i)
+    {
+        if (begin[i] == to_find)
+            break;
+    }
+    end[-1] = last;
+    if (i == last_index)
+        return size_t(-1);
+    else
+        return i;
+}
+template<typename It>
+size_t find_index_no_bounds_checking_unrolled(It begin, It end, int to_find)
+{
+    if (begin == end)
+        return size_t(-1);
+    int last = end[-1];
+    size_t last_index = (end - begin) - 1;
+    if (to_find == last)
+        return last_index;
+    end[-1] = to_find;
+    size_t i = 0;
+    for (;; i += 2)
+    {
+        if (begin[i] == to_find)
+            break;
+        if (begin[i + 1] == to_find)
+        {
+            i += 1;
+            break;
+        }
+    }
+    end[-1] = last;
+    if (i == last_index)
+        return size_t(-1);
+    else
+        return i;
+}
+
+template<typename It>
+int find_index(It begin, int to_find)
+{
+    for (int i = 0;; ++i, ++begin)
+    {
+        if (*begin == to_find)
+            return i;
+    }
+}
+template<typename It>
+int find_index_random_access(It begin, int to_find)
+{
+    for (int i = 0;; ++i)
+    {
+        if (begin[i] == to_find)
+            return i;
+    }
+}
+template<typename It>
+int find_index_knuth(It begin, int to_find)
+{
+    int i = 0;
+    for (;; i += 2)
+    {
+        if (begin[i] == to_find)
+            break;
+        if (begin[i + 1] == to_find)
+        {
+            ++i;
+            break;
+        }
+    }
+    return i;
+}
+template<typename It>
+int find_index_knuth_3(It begin, int to_find)
+{
+    int i = 0;
+    for (;; i += 3)
+    {
+        if (begin[i] == to_find)
+            break;
+        if (begin[i + 1] == to_find)
+        {
+            ++i;
+            break;
+        }
+        if (begin[i + 2] == to_find)
+        {
+            i += 2;
+            break;
+        }
+    }
+    return i;
+}
+template<typename It>
+int find_index_knuth_4(It begin, int to_find)
+{
+    int i = 0;
+    for (;; i += 4)
+    {
+        if (begin[i] == to_find)
+            break;
+        if (begin[i + 1] == to_find)
+        {
+            ++i;
+            break;
+        }
+        if (begin[i + 2] == to_find)
+        {
+            i += 2;
+            break;
+        }
+        if (begin[i + 3] == to_find)
+        {
+            i += 3;
+            break;
+        }
+    }
+    return i;
+}
+
+void benchmark_find_in_vector(skb::State & state)
+{
+    std::minstd_rand randomness(5);
+    std::uniform_int_distribution<int> distribution;
+    std::vector<int> input;
+    input.reserve(state.range(0));
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+
+    std::uniform_int_distribution<size_t> random_index(0, input.size() - 1);
+    size_t num_iterations = 1024;
+    std::vector<int> to_search = input;
+    while (state.KeepRunning())
+    {
+        for (size_t i = 0; i < num_iterations; ++i)
+            skb::DoNotOptimize(find_index(to_search.begin(), input[no_inline_random_number(random_index, randomness)]));
+    }
+    state.SetItemsProcessed(state.iterations() * input.size() * num_iterations);
+}
+void benchmark_find_in_vector_random_access(skb::State & state)
+{
+    std::minstd_rand randomness(5);
+    std::uniform_int_distribution<int> distribution;
+    std::vector<int> input;
+    input.reserve(state.range(0));
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+
+    std::uniform_int_distribution<size_t> random_index(0, input.size() - 1);
+    size_t num_iterations = 1024;
+    std::vector<int> to_search = input;
+    while (state.KeepRunning())
+    {
+        for (size_t i = 0; i < num_iterations; ++i)
+            skb::DoNotOptimize(find_index_random_access(to_search.begin(), input[no_inline_random_number(random_index, randomness)]));
+    }
+    state.SetItemsProcessed(state.iterations() * input.size() * num_iterations);
+}
+void benchmark_find_in_vector_knuth(skb::State & state)
+{
+    std::minstd_rand randomness(5);
+    std::uniform_int_distribution<int> distribution;
+    std::vector<int> input;
+    input.reserve(state.range(0));
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+
+    std::uniform_int_distribution<size_t> random_index(0, input.size() - 1);
+    size_t num_iterations = 1024;
+    std::vector<int> to_search = input;
+    while (state.KeepRunning())
+    {
+        for (size_t i = 0; i < num_iterations; ++i)
+            skb::DoNotOptimize(find_index_knuth(to_search.begin(), input[no_inline_random_number(random_index, randomness)]));
+    }
+    state.SetItemsProcessed(state.iterations() * input.size() * num_iterations);
+}
+void benchmark_find_in_vector_knuth_3(skb::State & state)
+{
+    std::minstd_rand randomness(5);
+    std::uniform_int_distribution<int> distribution;
+    std::vector<int> input;
+    input.reserve(state.range(0));
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+
+    std::uniform_int_distribution<size_t> random_index(0, input.size() - 1);
+    size_t num_iterations = 1024;
+    std::vector<int> to_search = input;
+    while (state.KeepRunning())
+    {
+        for (size_t i = 0; i < num_iterations; ++i)
+            skb::DoNotOptimize(find_index_knuth_3(to_search.begin(), input[no_inline_random_number(random_index, randomness)]));
+    }
+    state.SetItemsProcessed(state.iterations() * input.size() * num_iterations);
+}
+void benchmark_find_in_vector_knuth_4(skb::State & state)
+{
+    std::minstd_rand randomness(5);
+    std::uniform_int_distribution<int> distribution;
+    std::vector<int> input;
+    input.reserve(state.range(0));
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+
+    std::uniform_int_distribution<size_t> random_index(0, input.size() - 1);
+    size_t num_iterations = 1024;
+    std::vector<int> to_search = input;
+    while (state.KeepRunning())
+    {
+        for (size_t i = 0; i < num_iterations; ++i)
+            skb::DoNotOptimize(find_index_knuth_4(to_search.begin(), input[no_inline_random_number(random_index, randomness)]));
+    }
+    state.SetItemsProcessed(state.iterations() * input.size() * num_iterations);
+}
+void benchmark_find_in_vector_bounds_checked(skb::State & state)
+{
+    std::minstd_rand randomness(5);
+    std::uniform_int_distribution<int> distribution;
+    std::vector<int> input;
+    input.reserve(state.range(0));
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+
+    std::uniform_int_distribution<size_t> random_index(0, input.size() - 1);
+    size_t num_iterations = 1024;
+    std::vector<int> to_search = input;
+    while (state.KeepRunning())
+    {
+        for (size_t i = 0; i < num_iterations; ++i)
+            skb::DoNotOptimize(find_index_with_end(to_search.begin(), to_search.end(), input[no_inline_random_number(random_index, randomness)]));
+    }
+    state.SetItemsProcessed(state.iterations() * input.size() * num_iterations);
+}
+void benchmark_find_in_vector_no_bounds_checking(skb::State & state)
+{
+    std::minstd_rand randomness(5);
+    std::uniform_int_distribution<int> distribution;
+    std::vector<int> input;
+    input.reserve(state.range(0));
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+
+    std::uniform_int_distribution<size_t> random_index(0, input.size() - 1);
+    size_t num_iterations = 1024;
+    std::vector<int> to_search = input;
+    while (state.KeepRunning())
+    {
+        for (size_t i = 0; i < num_iterations; ++i)
+            skb::DoNotOptimize(find_index_no_bounds_checking(to_search.begin(), to_search.end(), input[no_inline_random_number(random_index, randomness)]));
+    }
+    state.SetItemsProcessed(state.iterations() * input.size() * num_iterations);
+}
+void benchmark_find_in_vector_no_bounds_checking_unrolled(skb::State & state)
+{
+    std::minstd_rand randomness(5);
+    std::uniform_int_distribution<int> distribution;
+    std::vector<int> input;
+    input.reserve(state.range(0));
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+
+    std::uniform_int_distribution<size_t> random_index(0, input.size() - 1);
+    size_t num_iterations = 1024;
+    std::vector<int> to_search = input;
+    while (state.KeepRunning())
+    {
+        for (size_t i = 0; i < num_iterations; ++i)
+            skb::DoNotOptimize(find_index_no_bounds_checking_unrolled(to_search.begin(), to_search.end(), input[no_inline_random_number(random_index, randomness)]));
+    }
+    state.SetItemsProcessed(state.iterations() * input.size() * num_iterations);
+}
+void benchmark_find_in_forward_list(skb::State & state)
+{
+    std::minstd_rand randomness(5);
+    std::uniform_int_distribution<int> distribution;
+    std::vector<int> input;
+    input.reserve(state.range(0));
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+
+    std::uniform_int_distribution<size_t> random_index(0, input.size() - 1);
+    size_t num_iterations = 1024;
+    std::forward_list<int> to_search(input.begin(), input.end());
+    while (state.KeepRunning())
+    {
+        for (size_t i = 0; i < num_iterations; ++i)
+            skb::DoNotOptimize(find_index(to_search.begin(), input[no_inline_random_number(random_index, randomness)]));
+    }
+    state.SetItemsProcessed(state.iterations() * input.size() * num_iterations);
+}
+void benchmark_find_index_baseline(skb::State & state)
+{
+    std::minstd_rand randomness(5);
+    std::uniform_int_distribution<int> distribution;
+    std::vector<int> input;
+    input.reserve(state.range(0));
+    while (input.size() != input.capacity())
+        input.push_back(distribution(randomness));
+
+    std::uniform_int_distribution<size_t> random_index(0, input.size() - 1);
+    size_t num_iterations = 1024;
+    while (state.KeepRunning())
+    {
+        for (size_t i = 0; i < num_iterations; ++i)
+            skb::DoNotOptimize(input[no_inline_random_number(random_index, randomness)]);
+    }
+    state.SetItemsProcessed(state.iterations() * input.size() * num_iterations);
+}
+SKA_BENCHMARK("baseline", benchmark_find_index_baseline);
+
 void register_ocaml_multiply()
 {
     SKA_BENCHMARK_NAME(&skbenchmark_ocaml_multiply<&xor_baseline>, "baseline", "ocaml_multiply_baseline");
@@ -1094,4 +3012,180 @@ void register_ocaml_multiply()
     SKA_BENCHMARK_NAME(&skbenchmark_ocaml_multiply<&my_ocaml_multiply_xor>, "ocaml", "my_multiply_xor")->SetBaseline("ocaml_multiply_baseline")->SetRange(4, 1024*1024)->SetRangeMultiplier(8);
     SKA_BENCHMARK_NAME(&skbenchmark_ocaml_multiply<&ocaml_subtract>, "ocaml", "subtract")->SetBaseline("ocaml_multiply_baseline")->SetRange(4, 1024*1024)->SetRangeMultiplier(8);
     SKA_BENCHMARK_NAME(&skbenchmark_ocaml_multiply<&my_ocaml_subtract>, "ocaml", "my_subtract")->SetBaseline("ocaml_multiply_baseline")->SetRange(4, 1024*1024)->SetRangeMultiplier(8);
+    SKA_BENCHMARK_NAME(&benchmark_find_in_vector, "ocaml", "find_in_vector")->SetBaseline("benchmark_find_index_baseline")->SetRange(4, 1024*1024*128)->SetRangeMultiplier(std::pow(2.0, 0.25));
+    SKA_BENCHMARK_NAME(&benchmark_find_in_vector_random_access, "ocaml", "find_in_vector_random_access")->SetBaseline("benchmark_find_index_baseline")->SetRange(4, 1024*1024*128)->SetRangeMultiplier(std::pow(2.0, 0.25));
+    SKA_BENCHMARK_NAME(&benchmark_find_in_vector_knuth, "ocaml", "find_in_vector_knuth")->SetBaseline("benchmark_find_index_baseline")->SetRange(4, 1024*1024*128)->SetRangeMultiplier(std::pow(2.0, 0.25));
+    SKA_BENCHMARK_NAME(&benchmark_find_in_vector_knuth_3, "ocaml", "find_in_vector_knuth_3")->SetBaseline("benchmark_find_index_baseline")->SetRange(4, 1024*1024*128)->SetRangeMultiplier(std::pow(2.0, 0.25));
+    SKA_BENCHMARK_NAME(&benchmark_find_in_vector_knuth_4, "ocaml", "find_in_vector_knuth_4")->SetBaseline("benchmark_find_index_baseline")->SetRange(4, 1024*1024*128)->SetRangeMultiplier(std::pow(2.0, 0.25));
+    SKA_BENCHMARK_NAME(&benchmark_find_in_forward_list, "ocaml", "find_in_list")->SetBaseline("benchmark_find_index_baseline")->SetRange(4, 1024*1024*128)->SetRangeMultiplier(std::pow(2.0, 0.25));
+    SKA_BENCHMARK_NAME(&benchmark_find_in_vector_bounds_checked, "ocaml", "find_in_vector_bounds_checked")->SetBaseline("benchmark_find_index_baseline")->SetRange(4, 1024*1024*128)->SetRangeMultiplier(std::pow(2.0, 0.25));
+    SKA_BENCHMARK_NAME(&benchmark_find_in_vector_no_bounds_checking, "ocaml", "find_in_vector_no_bounds_checking")->SetBaseline("benchmark_find_index_baseline")->SetRange(4, 1024*1024*128)->SetRangeMultiplier(std::pow(2.0, 0.25));
+    SKA_BENCHMARK_NAME(&benchmark_find_in_vector_no_bounds_checking_unrolled, "ocaml", "find_in_vector_no_bounds_checking_unrolled")->SetBaseline("benchmark_find_index_baseline")->SetRange(4, 1024*1024*128)->SetRangeMultiplier(std::pow(2.0, 0.25));
 }
+
+
+
+
+void benchmark_heap_baseline(benchmark::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        for (int i = 0; i < num_items; ++i)
+            benchmark::DoNotOptimize(no_inline_random_number(distribution, randomness));
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+BENCHMARK(benchmark_heap_baseline)->Range(4, 1024*1024*16);
+
+void benchmark_push_minmax_heap(benchmark::State & state)
+{
+    std::vector<int> heap;
+    int num_items = state.range(0);
+    heap.reserve(num_items);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+        {
+            heap.push_back(no_inline_random_number(distribution, randomness));
+            push_minmax_heap(heap.begin(), heap.end());
+        }
+        benchmark::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+BENCHMARK(benchmark_push_minmax_heap)->Range(4, 1024*1024*16);
+
+template<int D>
+void benchmark_push_dary_heap(benchmark::State & state)
+{
+    std::vector<int> heap;
+    int num_items = state.range(0);
+    heap.reserve(num_items);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+        {
+            heap.push_back(no_inline_random_number(distribution, randomness));
+            push_dary_heap<D>(heap.begin(), heap.end());
+        }
+        benchmark::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+BENCHMARK_TEMPLATE(benchmark_push_dary_heap, 2)->Range(4, 1024*1024*16);
+BENCHMARK_TEMPLATE(benchmark_push_dary_heap, 4)->Range(4, 1024*1024*16);
+
+void benchmark_make_minmax_heap(benchmark::State & state)
+{
+    std::vector<int> heap;
+    int num_items = state.range(0);
+    heap.reserve(num_items);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_minmax_heap(heap.begin(), heap.end());
+        benchmark::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+BENCHMARK(benchmark_make_minmax_heap)->Range(4, 1024*1024*16);
+
+template<int D>
+void benchmark_make_dary_heap(benchmark::State & state)
+{
+    std::vector<int> heap;
+    int num_items = state.range(0);
+    heap.reserve(num_items);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<D>(heap.begin(), heap.end());
+        benchmark::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+BENCHMARK_TEMPLATE(benchmark_make_dary_heap, 2)->Range(4, 1024*1024*16);
+BENCHMARK_TEMPLATE(benchmark_make_dary_heap, 4)->Range(4, 1024*1024*16);
+
+void benchmark_pop_minmax_heap_min(benchmark::State & state)
+{
+    std::vector<int> heap;
+    int num_items = state.range(0);
+    heap.reserve(num_items);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_minmax_heap(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_minmax_heap_min(heap.begin(), heap.end() - i);
+        benchmark::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+BENCHMARK(benchmark_pop_minmax_heap_min)->Range(4, 1024*1024*16);
+
+void benchmark_pop_minmax_heap_max(benchmark::State & state)
+{
+    std::vector<int> heap;
+    int num_items = state.range(0);
+    heap.reserve(num_items);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_minmax_heap(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_minmax_heap_max(heap.begin(), heap.end() - i);
+        benchmark::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+BENCHMARK(benchmark_pop_minmax_heap_max)->Range(4, 1024*1024*16);
+
+template<int D>
+void benchmark_pop_dary_heap(benchmark::State & state)
+{
+    int num_items = state.range(0);
+    std::uniform_int_distribution<int> distribution;
+    std::mt19937_64 & randomness = global_randomness;
+    std::vector<int> heap;
+    heap.reserve(num_items);
+    while (state.KeepRunning())
+    {
+        heap.clear();
+        for (int i = 0; i < num_items; ++i)
+            heap.push_back(no_inline_random_number(distribution, randomness));
+        make_dary_heap<D>(heap.begin(), heap.end());
+        for (int i = 0; i < num_items; ++i)
+            pop_dary_heap<D>(heap.begin(), heap.end() - i);
+        benchmark::DoNotOptimize(heap.back());
+    }
+    state.SetItemsProcessed(num_items * state.iterations());
+}
+BENCHMARK_TEMPLATE(benchmark_pop_dary_heap, 2)->Range(4, 1024*1024*16);
+BENCHMARK_TEMPLATE(benchmark_pop_dary_heap, 4)->Range(4, 1024*1024*16);
+

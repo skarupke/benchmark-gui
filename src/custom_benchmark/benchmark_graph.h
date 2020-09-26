@@ -21,6 +21,7 @@ public:
     virtual void paintEvent(QPaintEvent*) override;
 
     void SetNormalizeForMemory(bool value);
+    void SetDrawAsPoints(bool value);
 
     const std::vector<skb::BenchmarkResults *> & GetData() const
     {
@@ -48,6 +49,7 @@ private:
     std::vector<skb::BenchmarkResults *> data;
     std::vector<sig2::Connection<skb::BenchmarkResults *>> callbacks;
     bool normalize_for_memory = false;
+    bool draw_as_points = false;
     QImage lines;
     bool lines_dirty = true;
     struct DrawnPoint

@@ -32,6 +32,7 @@ BenchmarkMainGui::BenchmarkMainGui()
     : run_current("Run Current")
     , reset_current("Delete Current Results")
     , normalize_checkbox("Normalize For Memory")
+    , draw_points_checkbox("Draw as Points")
     , prefer_visible_checkbox("Run Only Visible")
     , profile_mode("Profile Mode")
     , xlimit("0")
@@ -80,6 +81,10 @@ BenchmarkMainGui::BenchmarkMainGui()
     {
         graph.SetNormalizeForMemory(state != 0);
     });
+    QObject::connect(&draw_points_checkbox, &QCheckBox::stateChanged, this, [&](int state)
+    {
+        graph.SetDrawAsPoints(state != 0);
+    });
 
     xlimit.setValidator(new QIntValidator());
     xlimit.setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
@@ -108,9 +113,10 @@ BenchmarkMainGui::BenchmarkMainGui()
     rhs_layout->addWidget(&xlimit, 1, 0);
     rhs_layout->addWidget(&run_current, 2, 0);
     rhs_layout->addWidget(&normalize_checkbox, 3, 0);
-    rhs_layout->addWidget(&prefer_visible_checkbox, 4, 0);
-    rhs_layout->addWidget(&profile_mode, 5, 0);
-    rhs_layout->addWidget(&reset_current, 6, 0);
+    rhs_layout->addWidget(&draw_points_checkbox, 4, 0);
+    rhs_layout->addWidget(&prefer_visible_checkbox, 5, 0);
+    rhs_layout->addWidget(&profile_mode, 6, 0);
+    rhs_layout->addWidget(&reset_current, 7, 0);
     layout.addLayout(rhs_layout, 1, 1);
 }
 

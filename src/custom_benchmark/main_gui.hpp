@@ -41,6 +41,7 @@ private:
     QPushButton run_current;
     QPushButton reset_current;
     QCheckBox normalize_checkbox;
+    QCheckBox draw_points_checkbox;
     QCheckBox prefer_visible_checkbox;
     QCheckBox profile_mode;
     QLineEdit xlimit;

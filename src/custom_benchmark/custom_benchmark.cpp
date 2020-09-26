@@ -260,11 +260,22 @@ std::vector<int> Benchmark::GetAllArguments() const
         if (range_begin == range_end)
             return {range_begin};
         double multiplier = range_multiplier;
-        if (multiplier <= 0.0)
+        if (multiplier <= 1.0)
             multiplier = 8.0;
-        for (double i = range_begin; i < range_end; i = std::max(i + 1.0, i * multiplier))
+        all_arguments.push_back(range_begin);
+        for (double i = range_begin * multiplier; i < range_end;)
         {
-            all_arguments.push_back(static_cast<int>(i));
+            int rounded = static_cast<int>(i + 0.5f);
+            if (rounded <= all_arguments.back())
+                all_arguments.push_back(all_arguments.back() + 1);
+            else
+                all_arguments.push_back(rounded);
+            for (;;)
+            {
+                i = i * multiplier;
+                if (i >= all_arguments.back())
+                    break;
+            }
         }
         if (all_arguments.back() != range_end)
             all_arguments.push_back(range_end);
