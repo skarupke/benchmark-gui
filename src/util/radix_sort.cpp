@@ -2302,6 +2302,7 @@ void RegisterSortForType(skb::CategoryBuilder categories_so_far, const interned_
 extern void RegisterStdSort();
 extern void RegisterBoostSorts();
 extern void RegisterRegionsSort();
+extern void RegisterLearnedSort();
 
 void RegisterSorting()
 {
@@ -2322,6 +2323,7 @@ void RegisterSorting()
     RegisterStdSort();
     RegisterBoostSorts();
     RegisterRegionsSort();
+    RegisterLearnedSort();
 }
 
 #endif

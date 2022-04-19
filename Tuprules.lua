@@ -58,6 +58,11 @@ DEFINES += 'QT_NO_KEYWORDS'
 --DEFINES += 'RUN_SLOW_TESTS'
 
 CPP_FLAGS += '-std=c++17'
+CPP_FLAGS += '-msse3'
+CPP_FLAGS += '-mssse3'
+CPP_FLAGS += '-msse4'
+CPP_FLAGS += '-msse4.1'
+CPP_FLAGS += '-msse4.2'
 
 -- preprocess only
 --CPP_FLAGS += '-E'
@@ -117,5 +122,12 @@ function compile_cpp(source, inputs)
 	tup.definerule{ inputs = inputs,
 					command = CPP_COMPILER .. ' ' .. table.concat(flags, ' ') .. ' -c ' .. source .. ' -o ' .. source .. '.o',
 					outputs = outputs }
+end
+
+function mark_as_cachedir(dir)
+	local output = dir .. 'CACHEDIR.TAG'
+	tup.definerule{ inputs={},
+					command = 'echo "Signature: 8a477f597d28d172789f06886806bc55" > ' .. output,
+					outputs = { output } }
 end
 

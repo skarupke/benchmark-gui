@@ -7,6 +7,7 @@
 #include <forward_list>
 #include <memory>
 #include <debug/assert.hpp>
+#include <iterator>
 
 template<typename It, typename ValueType, typename Compare>
 void heap_replace_top(It begin, It end, ValueType && value, Compare && compare)
@@ -925,6 +926,70 @@ It largest_child(It first_child_it, int num_children, Compare && compare)
             return compare(*first_half_largest, *second_half_largest) ? second_half_largest : first_half_largest;
         }
     }
+}
+
+
+template<int D, typename It, typename Compare>
+void trickle_down(It begin, size_t length, size_t index, Compare && compare)
+{
+    typename std::iterator_traits<It>::value_type value = std::move(begin[index]);
+    for (;;)
+    {
+        uint64_t last_child = dary_heap_helpers::last_child_index<D>(index);
+        uint64_t first_child = last_child - (D - 1);
+        if (last_child < length)
+        {
+            It largest_child = dary_heap_helpers::largest_child<D>(begin + first_child, compare);
+            if (!compare(value, *largest_child))
+                break;
+            begin[index] = std::move(*largest_child);
+            index = largest_child - begin;
+        }
+        else if (first_child < length)
+        {
+            It largest_child = dary_heap_helpers::largest_child<D>(begin + first_child, length - first_child, compare);
+            if (compare(value, *largest_child))
+            {
+                begin[index] = std::move(*largest_child);
+                index = largest_child - begin;
+            }
+            break;
+        }
+        else
+            break;
+    }
+    begin[index] = std::move(value);
+}
+template<int D, typename It, typename Compare>
+void heapify(It begin, It to_update, It end, Compare && compare)
+{
+    using std::swap;
+    size_t index = to_update - begin;
+    if (index)
+    {
+        size_t parent = dary_heap_helpers::parent_index<D>(index);
+        if (compare(begin[parent], *to_update))
+        {
+            do
+            {
+                swap(begin[parent], begin[index]);
+                index = parent;
+                if (index == 0)
+                    break;
+                parent = dary_heap_helpers::parent_index<D>(index);
+            }
+            while (compare(begin[parent], begin[index]));
+            return;
+        }
+    }
+    trickle_down<D>(begin, end - begin, index, compare);
+}
+
+template<int D, typename It, typename Compare>
+void remove_from_heap(It begin, It to_remove, It end, Compare && compare)
+{
+    std::iter_swap(to_remove, end - 1);
+    heapify<D>(begin, to_remove, end, compare);
 }
 }
 
@@ -3282,4 +3347,524 @@ public:
         }
     }
 };
+
+#include <iostream>
+template<typename T, typename Compare = std::less<>>
+struct PairingHeapForSort
+{
+private:
+
+    template<typename U>
+    struct NonDeletingUniquePtr
+    {
+        NonDeletingUniquePtr()
+            : ptr()
+        {
+        }
+        explicit NonDeletingUniquePtr(U * ptr)
+            : ptr(ptr)
+        {
+        }
+        NonDeletingUniquePtr(NonDeletingUniquePtr && other)
+            : ptr(other.ptr)
+        {
+            other.ptr = nullptr;
+        }
+        NonDeletingUniquePtr & operator=(NonDeletingUniquePtr && other)
+        {
+            swap(other);
+            return *this;
+        }
+        ~NonDeletingUniquePtr()
+        {
+#ifdef DEBUG_BUILD
+            CHECK_FOR_PROGRAMMER_ERROR(!ptr);
+#endif
+        }
+
+        U & operator*() const
+        {
+            return ptr;
+        }
+        U * operator->() const
+        {
+            return ptr;
+        }
+        void swap(NonDeletingUniquePtr & other)
+        {
+            std::swap(ptr, other.ptr);
+        }
+
+        explicit operator bool() const
+        {
+            return ptr != nullptr;
+        }
+        bool operator !() const
+        {
+            return ptr == nullptr;
+        }
+
+        U * release()
+        {
+            U * result = ptr;
+            ptr = nullptr;
+            return result;
+        }
+
+    private:
+        U * ptr;
+    };
+
+    struct PairingTree
+    {
+        explicit PairingTree(const T & elem) noexcept(noexcept(T(std::declval<const T &>())))
+            : elem(elem)
+        {
+        }
+        explicit PairingTree(T && elem) noexcept(noexcept(T(std::declval<T &&>())))
+            : elem(std::move(elem))
+        {
+        }
+        void cleanup()
+        {
+#ifdef DEBUG_BUILD
+            if (sub_heaps)
+            {
+                sub_heaps->cleanup();
+                sub_heaps.release();
+            }
+            NonDeletingUniquePtr<PairingTree> tail = std::move(next);
+            for (;;)
+            {
+                if (!tail)
+                    break;
+                NonDeletingUniquePtr<PairingTree> new_tail = std::move(tail->next);
+                tail->cleanup();
+                tail.release();
+                tail = std::move(new_tail);
+            }
+#endif
+        }
+
+        T elem;
+        NonDeletingUniquePtr<PairingTree> sub_heaps;
+        NonDeletingUniquePtr<PairingTree> next;
+
+        void add_to_front(NonDeletingUniquePtr<PairingTree> && to_add) noexcept
+        {
+            if (next)
+            {
+                NonDeletingUniquePtr<PairingTree> * tail = &to_add->next;
+                while (*tail)
+                    tail = &(*tail)->next;
+                *tail = std::move(next);
+            }
+            next = std::move(to_add);
+        }
+    };
+    // root->next will always be null
+    NonDeletingUniquePtr<PairingTree> root;
+
+    inline static void meld_neither_empty(NonDeletingUniquePtr<PairingTree> & target, NonDeletingUniquePtr<PairingTree> && other, const Compare & cmp) noexcept
+    {
+        if (cmp(other->elem, target->elem))
+            target.swap(other);
+        NonDeletingUniquePtr<PairingTree> & to_add_to = target->sub_heaps;
+        if (to_add_to)
+            to_add_to->add_to_front(std::move(other));
+        else
+            to_add_to = std::move(other);
+    }
+
+    static NonDeletingUniquePtr<PairingTree> merge_pairs(NonDeletingUniquePtr<PairingTree> sub_heaps, const Compare & cmp)
+    {
+        NonDeletingUniquePtr<PairingTree> tail(std::move(sub_heaps->next));
+        static size_t max_num_loops = 0;
+        size_t num_loops = 0;
+        while (tail)
+        {
+            ++num_loops;
+            NonDeletingUniquePtr<PairingTree> first_only(std::move(tail));
+            NonDeletingUniquePtr<PairingTree> second_only(std::move(first_only->next));
+            if (second_only)
+            {
+                tail = std::move(second_only->next);
+                meld_neither_empty(first_only, std::move(second_only), cmp);
+            }
+            meld_neither_empty(sub_heaps, std::move(first_only), cmp);
+        }
+        if (num_loops > max_num_loops)
+        {
+            max_num_loops = num_loops;
+            //std::cout << "num loops: " << num_loops << std::endl;
+        }
+        return sub_heaps;
+    }
+
+public:
+
+    PairingHeapForSort() = default;
+    PairingHeapForSort(PairingHeapForSort &&) = default;
+    PairingHeapForSort & operator=(PairingHeapForSort &&) = default;
+    ~PairingHeapForSort()
+    {
+        if (root)
+        {
+            root->cleanup();
+            root.release();
+        }
+    }
+
+    struct MemoryPool
+    {
+    private:
+        NonDeletingUniquePtr<PairingTree> pool;
+        std::vector<PairingTree> memory;
+    public:
+        explicit MemoryPool(size_t size)
+        {
+            memory.reserve(size);
+        }
+
+        MemoryPool(MemoryPool &&) = delete;
+        MemoryPool & operator=(MemoryPool &&) = delete;
+        ~MemoryPool()
+        {
+            if (pool)
+            {
+                pool->cleanup();
+                pool.release();
+            }
+        }
+
+        /*void add(NonDeletingUniquePtr<PairingTree> && to_add) noexcept
+        {
+            if (pool)
+                pool->add_to_front(std::move(to_add));
+            else
+                pool = std::move(to_add);
+        }*/
+        void add_no_tail(NonDeletingUniquePtr<PairingTree> && to_add) noexcept
+        {
+            //CHECK_FOR_PROGRAMMER_ERROR(!to_add->next);
+            if (pool)
+                to_add->next = std::move(pool);
+            pool = std::move(to_add);
+        }
+
+        NonDeletingUniquePtr<PairingTree> take_one(T && elem) noexcept
+        {
+            if (!pool)
+            {
+                CHECK_FOR_PROGRAMMER_ERROR(memory.size() != memory.capacity());
+                memory.emplace_back(std::move(elem));
+                return NonDeletingUniquePtr<PairingTree>(&memory.back());
+            }
+            else
+            {
+                NonDeletingUniquePtr<PairingTree> result(std::move(pool));
+                pool = std::move(result->next);
+                //CHECK_FOR_PROGRAMMER_ERROR(!result->sub_heaps);
+                //if (result->sub_heaps)
+                //    add(std::move(result->sub_heaps));
+                result->elem = std::move(elem);
+                return result;
+            }
+        }
+    };
+
+    bool empty() const noexcept
+    {
+        return !root;
+    }
+    const T & min() const noexcept
+    {
+        return root->elem;
+    }
+    void insert(T && elem, MemoryPool & pool, const Compare & cmp) noexcept(noexcept(T(std::declval<T &&>())))
+    {
+        NonDeletingUniquePtr<PairingTree> new_tree = pool.take_one(std::move(elem));
+        if (!root)
+            root = std::move(new_tree);
+        else if (cmp(new_tree->elem, root->elem))
+        {
+            new_tree->sub_heaps = std::move(root);
+            root = std::move(new_tree);
+        }
+        else
+        {
+            new_tree->next = std::move(root->sub_heaps);
+            root->sub_heaps = std::move(new_tree);
+        }
+    }
+    void delete_min(MemoryPool & pool, const Compare & cmp) noexcept
+    {
+        NonDeletingUniquePtr<PairingTree> sub_heaps(std::move(root->sub_heaps));
+        pool.add_no_tail(std::move(root));
+        if (!sub_heaps)
+            return;
+
+        root = merge_pairs(std::move(sub_heaps), cmp);
+    }
+    void decrease_min(const Compare & cmp) noexcept
+    {
+        if (!root->sub_heaps)
+            return;
+
+        NonDeletingUniquePtr<PairingTree> next_largest = merge_pairs(std::move(root->sub_heaps), cmp);
+        meld_neither_empty(root, std::move(next_largest), cmp);
+    }
+};
+
+template<typename It, typename Compare>
+void heap_pair_heap_sort(It begin, It end, Compare compare)
+{
+    auto heap_order = [compare](const auto & l, const auto & r)
+    {
+        return compare(r, l);
+    };
+    make_dary_heap<2>(begin, end, heap_order);
+    size_t size = end - begin;
+    if (size < 3)
+        return;
+
+    auto pairing_heap_order = [begin, compare](size_t l, size_t r)
+    {
+        return compare(begin[l], begin[r]);
+    };
+    using PairingHeap = PairingHeapForSort<size_t, decltype(pairing_heap_order)>;
+    typename PairingHeap::MemoryPool pool(size);
+    PairingHeap heap;
+    static size_t largest_heap_size = 0;
+    size_t heap_size = 2;
+    heap.insert(1, pool, pairing_heap_order);
+    heap.insert(2, pool, pairing_heap_order);
+    for (size_t i = 1, end = size - 1; i < end;)
+    {
+        size_t min_index = heap.min();
+        if (min_index < i)
+        {
+            heap.delete_min(pool, pairing_heap_order);
+            --heap_size;
+            continue;
+        }
+        else if (min_index == i)
+        {
+            heap.delete_min(pool, pairing_heap_order);
+            --heap_size;
+        }
+        else
+        {
+            using std::swap;
+            swap(begin[i], begin[min_index]);
+            dary_heap_helpers::trickle_down<2>(begin, size, min_index, heap_order);
+            heap.decrease_min(pairing_heap_order);
+        }
+        size_t child = dary_heap_helpers::first_child_index<2>(i);
+        if (child < size)
+        {
+            heap.insert(size_t(child), pool, pairing_heap_order);
+            ++heap_size;
+            if (child + 1 < size)
+            {
+                heap.insert(child + 1, pool, pairing_heap_order);
+                ++heap_size;
+            }
+            if (heap_size > largest_heap_size)
+            {
+                largest_heap_size = heap_size;
+                //std::cout << "heap_size: " << heap_size << std::endl;
+            }
+        }
+        ++i;
+    }
+}
+template<typename It>
+void heap_pair_heap_sort(It begin, It end)
+{
+    heap_pair_heap_sort(begin, end, std::less<>{});
+}
+
+template<typename It, typename Compare>
+void heap_heap_sort(It begin, It end, Compare && compare)
+{
+    auto heap_order = [compare](const auto & l, const auto & r)
+    {
+        return compare(r, l);
+    };
+    make_dary_heap<2>(begin, end, heap_order);
+    size_t size = end - begin;
+    if (size < 3)
+        return;
+
+    struct SubHeap
+    {
+        It begin;
+        size_t index;
+        size_t length;
+    };
+    auto sub_heap_order = [compare](const SubHeap & l, const SubHeap & r)
+    {
+        return compare(r.begin[r.index], l.begin[l.index]);
+    };
+    std::vector<SubHeap> sub_heaps;
+    auto print_state = [&]
+    {
+        /*const char * separator = "";
+        for (auto it = begin; it != end; ++it)
+        {
+            std::cout << separator << *it;
+            separator = ", ";
+        }
+        for (const SubHeap & heap : sub_heaps)
+        {
+            std::cout << '\n' << (heap.begin - begin) << ", " << heap.index << ", " << heap.length << ", " << heap.begin[heap.index];
+        }
+        std::cout << std::endl;*/
+    };
+    auto split_heap = [&sub_heaps, &heap_order, &sub_heap_order](const SubHeap & heap)
+    {
+        size_t first_child = dary_heap_helpers::first_child_index<2>(heap.index);
+        if (first_child >= heap.length)
+            return;
+        size_t second_child = first_child + 1;
+        auto check_new_heap_is_good = [&]
+        {
+            /*auto end = sub_heaps.end() - 1;
+            It to_find_begin = end->begin + end->index;
+            auto found = std::find_if(sub_heaps.begin(), end, [=](const SubHeap & existing_heap)
+            {
+                It existing_begin = existing_heap.begin + existing_heap.index;
+                return to_find_begin == existing_begin;
+            });
+            CHECK_FOR_PROGRAMMER_ERROR(found == end);*/
+        };
+        if (second_child == heap.length)
+        {
+            sub_heaps.push_back({ heap.begin, first_child, heap.length });
+            check_new_heap_is_good();
+            return;
+        }
+        // example: heap of size 7
+        // highest_bit = 2
+        int highest_bit = minmax_heap_helpers::highest_set_bit(heap.length);
+        // lower_half = 4 - 1 = 3
+        size_t lower_half = (size_t(1) << highest_bit) - 1;
+        if (lower_half > second_child)
+        {
+            sub_heaps.push_back({ heap.begin, first_child, lower_half });
+            check_new_heap_is_good();
+            sub_heaps.push_back({ heap.begin, second_child, lower_half });
+            check_new_heap_is_good();
+            // problem: this is not necessarily where the last layer begins
+            // example 1: heap.begin = 0, index = 0, size = 32, lower_half = 31
+            //            last layer goes from 31 to 32. seems good
+            // example 2: heap.begin = 0, index = 1, size = 31, lower_half = 15
+            //            last layer goes from 15 to 23. seems good
+            // example 3: heap.begin = 0, index = 2, size = 31, lower_half = 15
+            //            last layer goes from 23 to 31. oops
+            size_t last_layer_first_index = heap.index;
+            while (last_layer_first_index < lower_half)
+                last_layer_first_index = dary_heap_helpers::first_child_index<2>(last_layer_first_index);
+            size_t last_layer_last_index = heap.index;
+            while (last_layer_last_index < lower_half)
+                last_layer_last_index = dary_heap_helpers::last_child_index<2>(last_layer_last_index);
+            last_layer_last_index = std::min(last_layer_last_index + 1, heap.length);
+            size_t last_layer_size = last_layer_last_index - last_layer_first_index;
+            It last_layer_begin = heap.begin + last_layer_first_index;
+            //size_t last_layer_size = heap.length - lower_half;
+            make_dary_heap<2>(last_layer_begin, last_layer_begin + last_layer_size, heap_order);
+            sub_heaps.push_back({ last_layer_begin, 0, last_layer_size });
+            check_new_heap_is_good();
+            push_dary_heap<2>(sub_heaps.begin(), sub_heaps.end() - 2, sub_heap_order);
+        }
+        else
+        {
+            sub_heaps.push_back({ heap.begin, first_child, heap.length });
+            check_new_heap_is_good();
+            sub_heaps.push_back({ heap.begin, second_child, heap.length });
+            check_new_heap_is_good();
+        }
+        push_dary_heap<2>(sub_heaps.begin(), sub_heaps.end() - 1, sub_heap_order);
+        push_dary_heap<2>(sub_heaps.begin(), sub_heaps.end(), sub_heap_order);
+    };
+    sub_heaps.reserve(size);
+    split_heap({ begin, 0, size });
+
+    for (auto it = begin + 1, it_end = end - 1; it < it_end;)
+    {
+        SubHeap next = sub_heaps.front();
+        It smallest_it = next.begin + next.index;
+        print_state();
+        if (smallest_it < it)
+        {
+            pop_dary_heap<2>(sub_heaps.begin(), sub_heaps.end(), sub_heap_order);
+            sub_heaps.pop_back();
+            continue;
+        }
+        else if (smallest_it == it)
+        {
+            pop_dary_heap<2>(sub_heaps.begin(), sub_heaps.end(), sub_heap_order);
+            sub_heaps.pop_back();
+            split_heap(next);
+        }
+        else
+        {
+            std::iter_swap(it, smallest_it);
+            dary_heap_helpers::trickle_down<2>(next.begin, next.length, next.index, heap_order);
+            auto found = std::find_if(sub_heaps.begin(), sub_heaps.end(), [&](const SubHeap & sub_heap)
+            {
+                return sub_heap.begin + sub_heap.index == it;
+            });
+            CHECK_FOR_PROGRAMMER_ERROR(found != sub_heaps.end());
+            SubHeap to_split = *found;
+            // found is in the wrong place, but also needs to be removed
+            // sub_heaps.begin() is also in the wrong place now and needs to trickle down
+            //
+            // how to do this correctly?
+            //
+            // X _ _ F _ _ _ L
+            //
+            // if L == F then
+            // pop L and trickle down X
+            //
+            // if *L > *X then
+            // L _ _ X _ _ _ F
+            // then heapify X, pop F and finally trickle down L
+            //
+            // if *L < *X then
+            // X _ _ L _ _ _ F
+            // then pop F, heapify L and finally trickle down X
+            print_state();
+            auto last = sub_heaps.end() - 1;
+            if (found == last)
+            {
+                sub_heaps.pop_back();
+                dary_heap_helpers::trickle_down<2>(sub_heaps.begin(), sub_heaps.size(), 0, sub_heap_order);
+            }
+            else if (sub_heap_order(sub_heaps.front(), *last))
+            {
+                *found = std::move(next);
+                sub_heaps.front() = std::move(*last);
+                sub_heaps.pop_back();
+                dary_heap_helpers::heapify<2>(sub_heaps.begin(), found, sub_heaps.end(), sub_heap_order);
+                dary_heap_helpers::trickle_down<2>(sub_heaps.begin(), sub_heaps.size(), 0, sub_heap_order);
+            }
+            else
+            {
+                *found = std::move(*last);
+                sub_heaps.pop_back();
+                dary_heap_helpers::heapify<2>(sub_heaps.begin(), found, sub_heaps.end(), sub_heap_order);
+                dary_heap_helpers::trickle_down<2>(sub_heaps.begin(), sub_heaps.size(), 0, sub_heap_order);
+            }
+            split_heap(to_split);
+        }
+        ++it;
+    }
+}
+template<typename It>
+void heap_heap_sort(It begin, It end)
+{
+    heap_heap_sort(begin, end, std::less<>{});
+}
 

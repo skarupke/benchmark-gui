@@ -327,6 +327,7 @@ void benchmark_successful_lookup_perfect(skb::State & state)
     state.SetItemsProcessed(state.iterations() * num_items);
 }
 
+void RegisterAglHashMap();
 void RegisterBlockHashMap();
 void RegisterBytellHashMap();
 void RegisterFlat16HashMap();
@@ -343,6 +344,7 @@ void RegisterUnorderedMap();
 
 void RegisterHashtableBenchmarks()
 {
+    RegisterAglHashMap();
     RegisterBlockHashMap();
     RegisterBytellHashMap();
     RegisterFlat16HashMap();

@@ -1,6 +1,5 @@
 #include "sorting_benchmarks/benchmark_sort.hpp"
 
-
 template<typename T>
 struct BenchmarkStdSort
 {

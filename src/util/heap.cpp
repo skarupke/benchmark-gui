@@ -1247,6 +1247,139 @@ TEST(pairing_push_heap, sort_more_loop)
     ASSERT_TRUE(pool.empty());
 }
 
+TEST(heap_pair_heap_sort, simple)
+{
+    std::vector<int> to_sort = { 4, 3, 2, 1 };
+    heap_pair_heap_sort(to_sort.begin(), to_sort.end());
+    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+}
+
+TEST(heap_pair_heap_sort, increasing_length)
+{
+    std::mt19937_64 randomness(5);
+    std::uniform_int_distribution<int> distribution(0, 10000);
+    std::vector<int> to_sort;
+    to_sort.reserve(10000);
+    while (to_sort.size() != to_sort.capacity())
+    {
+        std::shuffle(to_sort.begin(), to_sort.end(), randomness);
+        to_sort.push_back(distribution(randomness));
+        heap_pair_heap_sort(to_sort.begin(), to_sort.end());
+        if (!std::is_sorted(to_sort.begin(), to_sort.end()))
+        {
+            std::cout << "Not sorted: " << to_sort.size() << std::endl;
+        }
+        ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+    }
+    ASSERT_TRUE(false);
+}
+TEST(heap_heap_sort, simple)
+{
+    std::vector<int> to_sort = { 4, 3, 2, 1 };
+    heap_heap_sort(to_sort.begin(), to_sort.end());
+    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+}
+TEST(heap_heap_sort, five)
+{
+    std::vector<int> to_sort = { 4, 1, 3, 2, 5 };
+    heap_heap_sort(to_sort.begin(), to_sort.end());
+    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+}
+TEST(heap_heap_sort, eight)
+{
+    std::vector<int> to_sort = { 3, 4, 2, 5, 1, 7, 6, 8 };
+    heap_heap_sort(to_sort.begin(), to_sort.end());
+    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+}
+TEST(heap_heap_sort, nine)
+{
+    std::vector<int> to_sort = { 6, 5, 7, 8, 9, 4, 1, 2, 3 };
+    heap_heap_sort(to_sort.begin(), to_sort.end());
+    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+}
+
+TEST(heap_heap_sort, thirteen)
+{
+    std::vector<int> to_sort = { 1, 11, 10, 5, 4, 6, 7, 3, 12, 2, 9, 8, 13 };
+    heap_heap_sort(to_sort.begin(), to_sort.end());
+    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+}
+TEST(heap_heap_sort, thirty_two)
+{
+    std::vector<int> to_sort = { 21, 29, 27, 31, 1, 5, 14, 22,
+                                 16, 6, 12, 28, 32, 15, 17, 7,
+                                 24, 9, 13, 20, 26, 18, 23, 30,
+                                 4, 19, 3, 2, 25, 11, 10, 8 };
+    heap_heap_sort(to_sort.begin(), to_sort.end());
+    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+}
+TEST(heap_heap_sort, thirty_three)
+{
+    std::vector<int> to_sort = { 32, 1, 10, 16, 24, 6,
+                                 26, 15, 29, 12, 27, 25,
+                                 21, 5, 4, 22, 13, 19,
+                                 17, 33, 18, 11, 20, 8,
+                                 23, 14, 30, 31, 28, 7,
+                                 3, 9, 2 };
+    heap_heap_sort(to_sort.begin(), to_sort.end());
+    ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+}
+
+template<typename It, typename Compare>
+void heap_sort(It begin, It end, Compare && compare)
+{
+    if (end - begin < 2)
+        return;
+    make_dary_heap<2>(begin, end, compare);
+    auto last_pop = begin + 1;
+    for (;;)
+    {
+        pop_binary_heap_unrolled(begin, end, compare);
+//        pop_dary_heap<2>(begin, end, compare);
+        --end;
+        if (end == last_pop)
+            break;
+    }
+}
+template<typename It>
+void heap_sort(It begin, It end)
+{
+    heap_sort(begin, end, std::less<>{});
+}
+
+
+TEST(heap_heap_sort, increasing_length)
+{
+    std::mt19937_64 randomness(4);
+    std::uniform_int_distribution<int> distribution(0, 10000);
+    std::vector<int> to_sort;
+    std::vector<int> before_sorting;
+    to_sort.reserve(10000);
+    while (to_sort.size() != to_sort.capacity())
+    {
+        std::shuffle(to_sort.begin(), to_sort.end(), randomness);
+        to_sort.push_back(distribution(randomness));
+        before_sorting = to_sort;
+        heap_heap_sort(to_sort.begin(), to_sort.end());
+        if (!std::is_sorted(to_sort.begin(), to_sort.end()))
+        {
+            std::cout << "Not sorted: " << to_sort.size() << ", before:";
+            for (int i : before_sorting)
+            {
+                std::cout << '\n' << i;
+            }
+            std::cout << "\nAfter:";
+            for (int i : to_sort)
+            {
+                std::cout << '\n' << i;
+            }
+            std::cout << std::endl;
+        }
+        ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
+    }
+    ASSERT_TRUE(false);
+}
+
 #endif
 
 #include "custom_benchmark/custom_benchmark.h"

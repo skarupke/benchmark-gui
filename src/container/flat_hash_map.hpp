@@ -25,6 +25,7 @@ namespace ska
 struct prime_number_hash_policy;
 struct power_of_two_hash_policy;
 struct libdivide_prime_hash_policy;
+struct fibonacci_hash_policy;
 
 namespace detailv3
 {
@@ -185,6 +186,10 @@ struct sherwood_v3_entry
     {
         return distance_from_desired < 0;
     }
+    void set_empty()
+    {
+        distance_from_desired = -1;
+    }
     bool is_at_desired_position() const
     {
         return distance_from_desired <= 0;
@@ -199,7 +204,7 @@ struct sherwood_v3_entry
     void destroy_value()
     {
         value.~T();
-        distance_from_desired = -1;
+        set_empty();
     }
 
     int8_t distance_from_desired = -1;
@@ -281,7 +286,8 @@ struct HashPolicySelector<T, void_t<typename T::hash_policy>>
 enum FlatHashMapLookupType
 {
     SimpleLookup,
-    ExtraZeroCheck
+    ExtraZeroCheck,
+    EqualityCheck
 };
 
 template<typename T, typename FindKey, typename ArgumentHash, typename Hasher, typename ArgumentEqual, typename Equal, typename ArgumentAlloc, typename EntryAlloc, FlatHashMapLookupType lookup_type>
@@ -552,7 +558,7 @@ public:
             }
             return end();
         }
-        else// if constexpr (lookup_type == ExtraZeroCheck)
+        else if constexpr (lookup_type == ExtraZeroCheck)
         {
             size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
             EntryPointer it = entries + ptrdiff_t(index);
@@ -563,6 +569,22 @@ public:
             {
                 if (compares_equal(key, it->value))
                     return { it };
+            }
+            return end();
+        }
+        else
+        {
+            size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
+            EntryPointer it = entries + ptrdiff_t(index);
+            for (int8_t distance = 0;; ++distance, ++it)
+            {
+                if (it->distance_from_desired == distance)
+                {
+                    if (compares_equal(key, it->value))
+                        return { it };
+                }
+                else if (it->distance_from_desired < distance)
+                    break;
             }
             return end();
         }
@@ -1712,6 +1734,36 @@ private:
     uint8_t prime_index = 0;
 };
 
+struct fibonacci_hash_policy
+{
+    template<int /*num_extra_bits*/>
+    size_t index_for_hash(size_t hash, size_t /*num_slots_minus_one*/) const
+    {
+        return (11400714819323198485ull * hash) >> shift;
+    }
+    size_t keep_in_range(size_t index, size_t num_slots_minus_one) const
+    {
+        return index & num_slots_minus_one;
+    }
+
+    int8_t next_size_over(size_t & size) const
+    {
+        size = std::max(size_t(2), detailv3::next_power_of_two(size));
+        return 64 - detailv3::log2(size);
+    }
+    void commit(int8_t shift)
+    {
+        this->shift = shift;
+    }
+    void reset()
+    {
+        shift = 63;
+    }
+
+private:
+    int8_t shift = 63;
+};
+
 template<typename K, typename V, typename H = std::hash<K>, typename E = std::equal_to<K>, typename A = std::allocator<std::pair<K, V> >, detailv3::FlatHashMapLookupType lookup_type = detailv3::SimpleLookup >
 class flat_hash_map
         : public detailv3::sherwood_v3_table
@@ -1918,6 +1970,11 @@ template<typename T>
 struct libdivide_std_hash : std::hash<T>
 {
     typedef ska::libdivide_prime_hash_policy hash_policy;
+};
+template<typename T>
+struct fibonacci_std_hash : std::hash<T>
+{
+    typedef ska::fibonacci_hash_policy hash_policy;
 };
 
 } // end namespace ska

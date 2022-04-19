@@ -693,7 +693,7 @@ public:
         int result = 0;
         size_t hash = hash_object(key);
         static constexpr int num_extra_bits = sherwood_v6_constants<lookup_type>::num_extra_bits;
-        size_t index = hash_policy.index_for_hash<num_extra_bits>(hash, num_blocks_minus_one);
+        size_t index = hash_policy.template index_for_hash<num_extra_bits>(hash, num_blocks_minus_one);
         __m128i compare = _mm_or_si128(sherwood_v6_constants<lookup_type>::sixteen_distance_starts, _mm_set1_epi8(hash_policy.extra_bits_for_hash<num_extra_bits>(hash)));
         __m128i compare_distance = sherwood_v6_constants<lookup_type>::sixteen_distance_starts;
         for (BlockPointer lookup = entries + index;; ++lookup)

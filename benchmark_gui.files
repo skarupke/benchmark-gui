@@ -5356,3 +5356,12 @@ src/hashtable_benchmarks/by_container/libc++_unordered_map_benchmark.cpp
 src/container/libc++__hash_table.hpp
 src/container/libc++_unordered_map.cpp
 src/hashtable_benchmarks/erase.cpp
+src/util/finger_tree.hpp
+src/util/finger_tree.cpp
+src/util/learned_sort.h
+src/sorting_benchmarks/benchmark_learned_sort.cpp
+src/container/agl_table.hpp
+src/container/agl_table.cpp
+src/hashtable_benchmarks/by_container/agl_table.cpp
+src/container/agl_fib_table.hpp
+src/container/agl_fib_table.cpp

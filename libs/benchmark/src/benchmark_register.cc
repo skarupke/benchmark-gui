@@ -254,7 +254,7 @@ void Benchmark::AddRange(std::vector<int>* dst, int lo, int hi, float mult) {
   static const int kint32max = std::numeric_limits<int32_t>::max();
 
   // Now space out the benchmarks in multiples of "mult"
-  for (int32_t i = 1; i < kint32max / mult; i = std::max(i + 1, static_cast<int32_t>(i * mult))) {
+  for (int32_t i = 1; i < static_cast<float>(kint32max) / mult; i = std::max(i + 1, static_cast<int32_t>(i * mult))) {
     if (i >= hi) break;
     if (i > lo) {
       dst->push_back(i);

@@ -58,6 +58,9 @@ INPUT_FOLDERS += 'src/util/'
 INPUT_FOLDERS += 'libs/benchmark/src/'
 INPUT_FOLDERS += 'libs/Raduls/'
 
+mark_as_cachedir('src/')
+mark_as_cachedir('libs/')
+
 for v in ivalues(INPUT_FOLDERS) do
 	CPP_SOURCES += glob_cpp(v)
 	SHADER_SOURCES += glob_shader(v)
