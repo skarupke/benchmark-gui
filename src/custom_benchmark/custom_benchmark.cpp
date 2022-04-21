@@ -453,13 +453,36 @@ bool StrToInt(std::string_view str, I & to_fill)
     return result.ptr != str.data() && result.ptr == str.data() + str.size();
 }
 
+
+void check_for_error(int result)
+{
+    CHECK_FOR_PROGRAMMER_ERROR(result != -1);
+}
+
+std::string read_pipe(int pipe)
+{
+    std::string result;
+    constexpr int buffer_size = 1024;
+    char buffer[buffer_size];
+    for (;;)
+    {
+        ssize_t num_read = read(pipe, buffer, buffer_size);
+        if (num_read == 0)
+            break;
+        else if (num_read == -1)
+            check_for_error(num_read);
+        else
+        {
+            result.append(buffer, buffer + num_read);
+        }
+    }
+    check_for_error(close(pipe));
+    return result;
+}
+
 RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int argument)
 {
     int communication_pipe[2] = { 0, 0 };
-    auto check_for_error = [](int result)
-    {
-        CHECK_FOR_PROGRAMMER_ERROR(result != -1);
-    };
     check_for_error(pipe(communication_pipe));
     std::vector<std::string> arguments;
     arguments.push_back(my_executable_name);
@@ -473,7 +496,7 @@ RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int argument)
     for (std::string & str : arguments)
         as_char_pointers.push_back(const_cast<char *>(str.c_str()));
     as_char_pointers.push_back(nullptr);
-    pid_t pid = fork();
+    pid_t pid = vfork();
     CHECK_FOR_PROGRAMMER_ERROR(pid != -1);
     if (pid == 0)
     {
@@ -485,34 +508,15 @@ RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int argument)
         execv(my_executable_name.c_str(), as_char_pointers.data());
         // exec will only return if something goes wrong
         const char * error_str = strerror(errno);
-        std::cout << "Erorr: Couldn't launch executable " << my_executable_name << ". Error was " << error_str << std::endl;
+        std::cout << "Error: Couldn't launch executable " << my_executable_name << ". Error was " << error_str << std::endl;
         exit(1);
     }
     check_for_error(close(communication_pipe[1]));
-    std::string result;
-    constexpr int buffer_size = 1024;
-    char buffer[buffer_size];
-    for (;;)
-    {
-        ssize_t num_read = read(communication_pipe[0], buffer, buffer_size);
-        if (num_read == 0)
-            break;
-        else if (num_read == -1)
-            check_for_error(num_read);
-        else
-        {
-            result.append(buffer, buffer + num_read);
-        }
-    }
-    check_for_error(close(communication_pipe[0]));
+    std::string result = read_pipe(communication_pipe[0]);
     int child_return_code = 0;
     pid_t waited = waitpid(pid, &child_return_code, 0);
     CHECK_FOR_PROGRAMMER_ERROR(waited == pid);
     CHECK_FOR_PROGRAMMER_ERROR(WIFEXITED(child_return_code) && WEXITSTATUS(child_return_code) == 0);
-    if (!string_starts_with(result, subprocess_start_string))
-    {
-        CHECK_FOR_PROGRAMMER_ERROR(!"Something went wrong. Breakpoint here");
-    }
     size_t num_iterations_start = result.find(subprocess_num_iterations_string);
     CHECK_FOR_PROGRAMMER_ERROR(num_iterations_start != std::string::npos);
     size_t time_start = result.find(subprocess_time_string, num_iterations_start + subprocess_num_iterations_string.size());

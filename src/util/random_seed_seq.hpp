@@ -19,6 +19,8 @@ struct random_seed_seq
         return result;
     }
 
+    using result_type = std::random_device::result_type;
+
 private:
     std::random_device device;
 };

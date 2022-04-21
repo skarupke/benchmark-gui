@@ -66,7 +66,7 @@ struct PtrFn<Result (*)(Arguments...)>
 template<typename T>
 T to_functor(T func)
 {
-    return std::move(func);
+    return func;
 }
 template<typename Result, typename Class, typename... Arguments>
 detail::MemFn<Result (Class::*)(Arguments...)> to_functor(Result (Class::*func)(Arguments...))

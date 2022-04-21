@@ -1,6 +1,8 @@
 #include "hashtable_benchmarks/lookups.hpp"
 
+#if BENCHMARK_DENSE_HASH_MAP
 #include <google/dense_hash_map>
+#endif
 #include <map>
 #include <boost/container/flat_map.hpp>
 #include <boost/multi_index_container.hpp>
@@ -15,17 +17,12 @@
 #include <hash_map>
 
 
+#if BENCHMARK_DENSE_HASH_MAP
 template<typename K, typename V, typename H, typename E, typename A, typename... Args>
 void hashtable_emplace(google::dense_hash_map<K, V, H, E, A> & table, Args &&... args)
 {
     table.insert({std::forward<Args>(args)...});
 }
-template<typename K, typename V, typename H, typename E, typename A, typename... Args>
-void hashtable_emplace(__gnu_cxx::hash_map<K, V, H, E, A> & table, Args &&... args)
-{
-    table.insert({std::forward<Args>(args)...});
-}
-
 template<typename K, typename V, typename H, typename E, typename A>
 struct TableCreator<google::dense_hash_map<K, V, H, E, A>>
 {
@@ -48,6 +45,18 @@ struct TableCreator<google::dense_hash_map<K, V, H, E, A>>
         return result;
     }
 };
+template<typename K, typename V, typename H, typename E, typename A>
+struct MaxSupportedLoadFactor<google::dense_hash_map<K, V, H, E, A>>
+{
+    static constexpr float value = 0.9375f;
+};
+#endif
+template<typename K, typename V, typename H, typename E, typename A, typename... Args>
+void hashtable_emplace(__gnu_cxx::hash_map<K, V, H, E, A> & table, Args &&... args)
+{
+    table.insert({std::forward<Args>(args)...});
+}
+
 template<typename K, typename V, typename L, typename A>
 struct TableCreator<std::map<K, V, L, A>>
 {
@@ -115,11 +124,6 @@ struct MaxSupportedLoadFactor<std::map<K, V, L, A>>
     static constexpr float value = 0.0f;
 };
 template<typename K, typename V, typename H, typename E, typename A>
-struct MaxSupportedLoadFactor<google::dense_hash_map<K, V, H, E, A>>
-{
-    static constexpr float value = 0.9375f;
-};
-template<typename K, typename V, typename H, typename E, typename A>
 struct MaxSupportedLoadFactor<__gnu_cxx::hash_map<K, V, H, E, A>>
 {
     static constexpr float value = 0.0f;
@@ -151,7 +155,9 @@ void RegisterThirdPartyHashtables()
     RegisterLookups<std::map<KeyPlaceHolder, ValuePlaceHolder, std::less<>, ConstKeyAllocator>>()("map", categories_so_far);
     RegisterLookups<boost::container::flat_map<KeyPlaceHolder, ValuePlaceHolder, std::less<>, Allocator>>()("boost::flat_map", categories_so_far);
     RegisterLookups<multi_index<KeyPlaceHolder, ValuePlaceHolder, Allocator>>()("boost::multi_index", categories_so_far);
+#if BENCHMARK_DENSE_HASH_MAP
     RegisterLookups<google::dense_hash_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, Allocator>>()("dense_hash_map", categories_so_far);
+#endif
     RegisterLookups<__gnu_cxx::hash_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, Allocator>>()("gnu_cxx::hash_map", categories_so_far);
     skb::CategoryBuilder std_unordered_map = categories_so_far.AddCategory("unordered_map variant", "std::unordered_map");
     skb::CategoryBuilder boost_unordered_map = categories_so_far.AddCategory("unordered_map variant", "boost::unordered_map");

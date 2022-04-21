@@ -897,6 +897,7 @@ private:
         if constexpr (lookup_type == Bool)
         {
             free_block->filled[free_index] = true;
+            static_cast<void>(hash);
         }
         else
         {

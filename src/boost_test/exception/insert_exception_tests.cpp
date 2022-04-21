@@ -112,7 +112,7 @@ struct insert_test4 : public insert_test_base<T>
             it != end; ++it)
         {
 			strong.store(x, test::detail::tracker().count_allocations);
-            x.insert(it, boost::next(it));
+            x.insert(it, std::next(it));
         }
     }
 };
@@ -135,7 +135,7 @@ struct insert_test_rehash1 : public insert_test_base<T>
 		if (initial_elements) --initial_elements;
         BOOST_TEST(initial_elements < this->values.size());
         x.insert(this->values.begin(),
-                boost::next(this->values.begin(), initial_elements));
+                std::next(this->values.begin(), initial_elements));
         BOOST_TEST(bucket_count == x.bucket_count());
         return x;
     }
@@ -146,7 +146,7 @@ struct insert_test_rehash1 : public insert_test_base<T>
         BOOST_DEDUCED_TYPENAME T::const_iterator pos = x.cbegin();
 
         for(BOOST_DEDUCED_TYPENAME test::random_values<T>::const_iterator
-            it = boost::next(this->values.begin(), x.size()),
+            it = std::next(this->values.begin(), x.size()),
                 end = this->values.end();
             it != end && count < 10; ++it, ++count)
         {
@@ -170,7 +170,7 @@ struct insert_test_rehash2 : public insert_test_rehash1<T>
         int count = 0;
 
         for(BOOST_DEDUCED_TYPENAME test::random_values<T>::const_iterator
-            it = boost::next(this->values.begin(), x.size()),
+            it = std::next(this->values.begin(), x.size()),
                 end = this->values.end();
             it != end && count < 10; ++it, ++count)
         {
@@ -209,7 +209,7 @@ struct insert_test_rehash3 : public insert_test_base<T>
 
         BOOST_TEST(initial_elements < this->values.size());
         x.insert(this->values.begin(),
-                boost::next(this->values.begin(), initial_elements));
+                std::next(this->values.begin(), initial_elements));
         BOOST_TEST(original_bucket_count == x.bucket_count());
         return x;
     }
@@ -217,8 +217,8 @@ struct insert_test_rehash3 : public insert_test_base<T>
     void run(T& x) const {
         BOOST_DEDUCED_TYPENAME T::size_type bucket_count = x.bucket_count();
 
-        x.insert(boost::next(this->values.begin(), x.size()),
-                boost::next(this->values.begin(), x.size() + 20));
+        x.insert(std::next(this->values.begin(), x.size()),
+                std::next(this->values.begin(), x.size() + 20));
 
         // This isn't actually a failure, but it means the test isn't doing its
         // job.

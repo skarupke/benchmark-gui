@@ -89,10 +89,10 @@ void erase_tests1(Container*, test::random_generator generator)
                 prev = pos = x.begin();
             }
             else {
-                prev = boost::next(x.begin(), index - 1);
-                pos = boost::next(prev);
+                prev = std::next(x.begin(), index - 1);
+                pos = std::next(prev);
             }
-            next = boost::next(pos);
+            next = std::next(pos);
             BOOST_DEDUCED_TYPENAME Container::key_type
                 key = test::get_key<Container>(*pos);
             std::size_t count = x.count(key);
@@ -101,7 +101,7 @@ void erase_tests1(Container*, test::random_generator generator)
             --size;
             if(size > 0)
                 BOOST_TEST(index == 0 ? next == x.begin() :
-                        next == boost::next(prev));
+                        next == std::next(prev));
             BOOST_TEST(x.count(key) == count - 1);
             BOOST_TEST(x.size() == size);
             if (++iterations % 20 == 0) test::check_equivalent_keys(x);
@@ -175,10 +175,10 @@ void erase_tests1(Container*, test::random_generator generator)
                 prev = pos = x.begin();
             }
             else {
-                prev = boost::next(x.begin(), index - 1);
-                pos = boost::next(prev);
+                prev = std::next(x.begin(), index - 1);
+                pos = std::next(prev);
             }
-            next = boost::next(pos);
+            next = std::next(pos);
             BOOST_DEDUCED_TYPENAME Container::key_type
                 key = test::get_key<Container>(*pos);
             std::size_t count = x.count(key);
@@ -186,7 +186,7 @@ void erase_tests1(Container*, test::random_generator generator)
             --size;
             if(size > 0)
                 BOOST_TEST(index == 0 ? next == x.begin() :
-                        next == boost::next(prev));
+                        next == std::next(prev));
             BOOST_TEST(x.count(key) == count - 1);
             BOOST_TEST(x.size() == size);
             if (++iterations % 20 == 0) test::check_equivalent_keys(x);

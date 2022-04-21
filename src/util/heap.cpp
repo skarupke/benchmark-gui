@@ -1254,7 +1254,7 @@ TEST(heap_pair_heap_sort, simple)
     ASSERT_TRUE(std::is_sorted(to_sort.begin(), to_sort.end()));
 }
 
-TEST(heap_pair_heap_sort, increasing_length)
+TEST(heap_pair_heap_sort, DISABLED_increasing_length)
 {
     std::mt19937_64 randomness(5);
     std::uniform_int_distribution<int> distribution(0, 10000);
@@ -1348,7 +1348,7 @@ void heap_sort(It begin, It end)
 }
 
 
-TEST(heap_heap_sort, increasing_length)
+TEST(heap_heap_sort, DISABLED_increasing_length)
 {
     std::mt19937_64 randomness(4);
     std::uniform_int_distribution<int> distribution(0, 10000);

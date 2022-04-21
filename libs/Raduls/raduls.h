@@ -242,8 +242,7 @@ namespace raduls
             [[fallthrough]];
         case 1:
 			histo[*ptr]++;
-			ptr += sizeof(RECORD_T);
-            [[fallthrough]];
+            ptr += sizeof(RECORD_T);
         }
 
 		auto n_iters = n / 4;
@@ -281,8 +280,7 @@ namespace raduls
         case 1:
 			tmp[histo[*ptr]] = *src++;
 			histo[*ptr]++;
-			ptr += sizeof(RECORD_T);
-            [[fallthrough]];
+            ptr += sizeof(RECORD_T);
         }
 
 		for (uint64 i = n % 4; i < n; i += 4)
@@ -424,7 +422,6 @@ namespace raduls
             case 1:
 				BufferedScatterStep<RECORD_T, COUNTER_TYPE, BUFFER_WIDTH, BUFFER_WIDTH_IN_128BIT_WORDS>
 					(src, tmp, myHisto, copy_histo, ptr, byteValue, buffer, index_x, first_store);
-                [[fallthrough]];
             }
 
 			for (uint64 i = n % 4; i < n; i += 4)
@@ -510,8 +507,7 @@ namespace raduls
 				myHisto[byteValue]++;
 				if (index_x == (BUFFER_WIDTH - 1))
 					IntrCopy128<BUFFER_WIDTH_IN_128BIT_WORDS, BUFFER_16B_ALIGNED>::Copy(&tmp[myHisto[byteValue] - BUFFER_WIDTH], &buffer[byteValue * BUFFER_WIDTH]);
-				ptr += sizeof(RECORD_T);
-                [[fallthrough]];
+                ptr += sizeof(RECORD_T);
             }
 
 			for (uint64 i = n % 4; i < n; i += 4)
@@ -657,7 +653,6 @@ namespace raduls
                 case 1:
 					BufferedScatterStep<RECORD_T, COUNTER_TYPE, BUFFER_WIDTH, BUFFER_WIDTH_IN_128BIT_WORDS>
 						(src, tmp, globalHisto, copy_globalHisto, ptr, byteValue, buffer, index_x, first_store);
-                    [[fallthrough]];
                 }
 				
 				for (uint64 i = n_recs % 4; i < n_recs; i += 4)

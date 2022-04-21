@@ -18,7 +18,7 @@
 #include "container/flat_hash_map16.hpp"
 #include "container/ptr_hash_map.hpp"
 #include "container/unordered_map.hpp"
-#include "google/dense_hash_map"
+//#include "google/dense_hash_map"
 #include <future>
 #include <unistd.h>
 #include <ext/pb_ds/assoc_container.hpp>
@@ -158,12 +158,12 @@ template<typename T>
 void set_empty(T &)
 {
 }
-template<typename T>
+/*template<typename T>
 void set_empty(google::dense_hash_map<KNucleotideHash, T, KNucleotideHash::hash> & map)
 {
     static const KNucleotideHash empty("tttttttttttttttttttttttttttttttt");
     map.set_empty_key(empty);
-}
+}*/
 
 template<typename HashMap>
 HashMap calculate(const std::string& input, int size, size_t begin = 0, size_t end = -1)

@@ -340,20 +340,38 @@ TEST(ska_sort2, DISABLED_float_backwards)
     ASSERT_TRUE(std::is_sorted(copy_backwards.begin(), copy_backwards.end()));
 }
 
-// todo: enable
 #if 1
+
 
 struct ThrowingType
 {
-    operator int() const
+    ThrowingType() = default;
+    ThrowingType(const ThrowingType &) = default;
+    ThrowingType(ThrowingType &&)
     {
         throw 5;
     }
+    ThrowingType & operator=(const ThrowingType &) = default;
+    ThrowingType & operator=(ThrowingType &&)
+    {
+        throw 5;
+    }
+
+    friend bool operator<(const ThrowingType &, const ThrowingType &)
+    {
+        return false;
+    }
 };
+uint8_t to_radix_sort_key(const ThrowingType &)
+{
+    return 0;
+}
+
+using VariantType = std::variant<int, std::string, float, ThrowingType>;
 
 TEST(ska_sort2, variant)
 {
-    std::vector<std::variant<int, std::string, float>> to_sort;
+    std::vector<VariantType> to_sort;
     to_sort.emplace_back(5);
     to_sort.emplace_back(0);
     to_sort.emplace_back("foo");
@@ -367,9 +385,10 @@ TEST(ska_sort2, variant)
     to_sort.emplace_back("baz");
     to_sort.emplace_back("baz2");
     to_sort.emplace_back(7.0f);
-    ASSERT_THROW(to_sort[2].emplace<0>(ThrowingType()), int);
+    ThrowingType throw_on_move;
+    ASSERT_THROW(to_sort[2] = VariantType(throw_on_move), int);
     ASSERT_TRUE(to_sort[2].valueless_by_exception());
-    ASSERT_THROW(to_sort[3].emplace<0>(ThrowingType()), int);
+    ASSERT_THROW(to_sort[3] = VariantType(throw_on_move), int);
     ASSERT_TRUE(to_sort[3].valueless_by_exception());
     ASSERT_TRUE(TestAllSkaSort2Combinations(to_sort));
 }
@@ -378,7 +397,8 @@ TEST(ska_sort2, variant)
 #if 0
 TEST(ska_sort2, variant_in_pair)
 {
-    std::vector<std::pair<std::variant<int, float, std::string>, int>> to_sort;
+    ThrowingType throw_on_move;
+    std::vector<std::pair<VariantType, int>> to_sort;
     to_sort.emplace_back(5, 5);
     to_sort.emplace_back(0, 4);
     to_sort.emplace_back("foo", 2);
@@ -395,11 +415,12 @@ TEST(ska_sort2, variant_in_pair)
     to_sort.emplace_back(1.0f, -3);
     to_sort.emplace_back(1.0f, 3);
     to_sort.emplace_back(-2.0f, 2);
-    ASSERT_THROW(to_sort[2].first.emplace<0>(ThrowingType()), int);
+    ThrowingType throw_on_move;
+    ASSERT_THROW(to_sort[2].first = VariantType(throw_on_move), int);
     ASSERT_TRUE(to_sort[2].first.valueless_by_exception());
-    ASSERT_THROW(to_sort[3].first.emplace<0>(ThrowingType()), int);
+    ASSERT_THROW(to_sort[3].first = VariantType(throw_on_move), int);
     ASSERT_TRUE(to_sort[3].first.valueless_by_exception());
-    ASSERT_THROW(to_sort[4].first.emplace<0>(ThrowingType()), int);
+    ASSERT_THROW(to_sort[4].first = VariantType(throw_on_move), int);
     ASSERT_TRUE(to_sort[4].first.valueless_by_exception());
     ASSERT_TRUE(TestAllSkaSort2Combinations(to_sort));
 }
