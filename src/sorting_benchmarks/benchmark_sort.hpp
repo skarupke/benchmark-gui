@@ -225,6 +225,7 @@ void RegisterSortForType(skb::CategoryBuilder categories_so_far, interned_string
 template<template<typename> typename SortBenchmark>
 void RegisterSort(interned_string name, skb::CategoryBuilder categories_so_far = {})
 {
+    #ifdef DONE_PULLING_OUT_BINARY
     using namespace std::string_view_literals;
     RegisterSortForType<SortBenchmark, int>(categories_so_far, name, "int", "int"sv);
     RegisterSortForType<SortBenchmark, uint8_t>(categories_so_far, name, "uint8_t", "uint8_t"sv);
@@ -239,6 +240,10 @@ void RegisterSort(interned_string name, skb::CategoryBuilder categories_so_far =
     RegisterSortForType<SortBenchmark, IntWithPadding<64>>(categories_so_far.AddCategory("struct size", "64"), name, "int", "int_size_64"sv);
     RegisterSortForType<SortBenchmark, IntWithPadding<256>>(categories_so_far.AddCategory("struct size", "256"), name, "int", "int_size_256"sv);
     RegisterSortForType<SortBenchmark, IntWithPadding<1024>>(categories_so_far.AddCategory("struct size", "1024"), name, "int", "int_size_1024"sv);
+    #else
+    static_cast<void>(name);
+    static_cast<void>(categories_so_far);
+    #endif
 }
 
 

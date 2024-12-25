@@ -555,10 +555,13 @@ public:
             BlockPointer block1 = entries1 + index1;
             for (size_t i = 0; i < Block::BlockSize; ++i)
             {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
                 if (block0->hashes[i] == hash_as_u32 && compares_equal(key, block0->data[i]))
                     return { block0, i + index0 * Block::BlockSize };
                 if (block1->hashes[i] == hash_as_u32 && compares_equal(key, block1->data[i]))
                     return { block1, i + index1 * Block::BlockSize };
+#pragma GCC diagnostic pop
             }
             return end();
         }

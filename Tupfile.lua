@@ -23,7 +23,6 @@ LINK_LIBS += '-lsqlite3'
 LINK_LIBS += '-lboost_system'
 LINK_LIBS += '-lboost_thread'
 LINK_LIBS += '-lstdc++fs'
-LINK_LIBS += '-ldispatch'
 
 INCLUDE_DIRS += tup.getcwd() .. '/src'
 INCLUDE_DIRS += tup.getcwd() .. '/libs'
@@ -38,10 +37,6 @@ SYSTEM_INCLUDE_DIRS += '/home/malte/workspace/iaca-lin64'
 
 INPUT_FOLDERS += './'
 INPUT_FOLDERS += 'src/'
-INPUT_FOLDERS += 'src/boost_test/exception/'
-INPUT_FOLDERS += 'src/boost_test/helpers/'
-INPUT_FOLDERS += 'src/boost_test/objects/'
-INPUT_FOLDERS += 'src/boost_test/unordered/'
 INPUT_FOLDERS += 'src/container/'
 INPUT_FOLDERS += 'src/custom_benchmark/'
 INPUT_FOLDERS += 'src/db/'
@@ -58,6 +53,8 @@ INPUT_FOLDERS += 'src/util/'
 INPUT_FOLDERS += 'libs/benchmark/src/'
 INPUT_FOLDERS += 'libs/Raduls/'
 
+EXECUTABLE_FOLDER = 'src/executables/'
+
 mark_as_cachedir('src/')
 mark_as_cachedir('libs/')
 
@@ -65,6 +62,7 @@ for v in ivalues(INPUT_FOLDERS) do
 	CPP_SOURCES += glob_cpp(v)
 	SHADER_SOURCES += glob_shader(v)
 end
+CPP_SOURCES += glob_cpp(EXECUTABLE_FOLDER)
 
 OUTPUT_FOLDERS = INPUT_FOLDERS
 
@@ -87,5 +85,19 @@ for v in ivalues(OUTPUT_FOLDERS) do
     objfiles += tup.glob(v .. '*.o')
 end
 tup.definerule{ inputs = objfiles,
-                command = CPP_LINKER .. ' ' .. table.concat(LINK_FLAGS, ' ') .. ' ' .. table.concat(objfiles, ' ') .. ' ' .. table.concat(LINK_LIBS, ' ') .. ' -o ' .. executable_name,
+                command = CPP_LINKER .. ' ' .. table.concat(LINK_FLAGS, ' ') .. ' %f ' .. table.concat(LINK_LIBS, ' ') .. ' -o %o',
                 outputs = {executable_name} }
+
+for v in ivalues(tup.glob(EXECUTABLE_FOLDER .. "*.o")) do
+    local objfiles
+    objfiles = {}
+    objfiles += v
+    objfiles += tup.glob('src/custom_benchmark/*.o')
+    objfiles += tup.glob('src/debug/*.o')
+    objfiles += tup.glob('src/util/*.o')
+    objfiles += tup.glob('libs/benchmark/src/*.o')
+    objfiles += tup.glob('libs/gtest/src/*.o')
+    tup.definerule{ inputs = objfiles,
+                    command = CPP_LINKER .. ' ' .. table.concat(LINK_FLAGS, ' ') .. ' %f ' .. table.concat(LINK_LIBS, ' ') .. ' -o %o',
+                    outputs = {tup.base(v) .. ".exe"} }
+end

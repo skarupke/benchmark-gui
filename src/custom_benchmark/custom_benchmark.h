@@ -202,6 +202,7 @@ struct BenchmarkResults
     std::map<int, std::vector<RunResults>> results;
 
     int my_global_index = -1;
+    interned_string executable;
 };
 
 struct BenchmarkCategories
@@ -209,7 +210,10 @@ struct BenchmarkCategories
     BenchmarkCategories(interned_string type, interned_string name);
 
     void AddCategory(interned_string category, interned_string value);
+    BenchmarkCategories AddCategoryCopy(interned_string category, interned_string value) const &;
+    BenchmarkCategories AddCategoryCopy(interned_string category, interned_string value) &&;
 
+    bool operator==(const BenchmarkCategories & other) const;
     bool operator<(const BenchmarkCategories & other) const;
 
     const interned_string & GetName() const;
@@ -226,7 +230,11 @@ struct BenchmarkCategories
 
     std::string CategoriesString() const;
 
+    std::string Serialize() const;
+    static BenchmarkCategories Deserialize(std::string_view);
+
 private:
+    BenchmarkCategories();
     ska::flat_hash_map<interned_string, interned_string> categories;
 };
 
@@ -245,6 +253,7 @@ struct Benchmark
 {
     virtual void Run(State & state) const = 0;
     Benchmark(BenchmarkCategories type);
+    Benchmark(BenchmarkCategories type, interned_string executable, int index_in_executable);
     virtual ~Benchmark();
 
     int FindGoodNumberOfIterations(int argument, float desired_running_time) const;
@@ -269,6 +278,16 @@ struct Benchmark
 
     std::vector<int> GetAllArguments() const;
 
+    struct RangeOfArguments {
+        int begin;
+        int end;
+        double multiplier;
+
+        std::string Serialize() const;
+        static RangeOfArguments Deserialize(std::string_view);
+    };
+    RangeOfArguments GetArgumentRange() const;
+
 private:
     interned_string baseline;
 
@@ -276,12 +295,14 @@ private:
     int range_end = 0;
     double range_multiplier = 0;
 
+protected:
     std::vector<skb::BenchmarkResults *> results;
 
+private:
     mutable std::mutex arguments_mutex;
     mutable std::vector<int> all_arguments;
 
-    void AddToAllBenchmarks(const BenchmarkCategories & categories);
+    skb::BenchmarkResults * AddToAllBenchmarks(const BenchmarkCategories & categories);
 };
 struct LambdaBenchmark : Benchmark
 {
@@ -290,8 +311,14 @@ struct LambdaBenchmark : Benchmark
 
     std::function<void (State & state)> function;
 };
+struct BenchmarkInOtherProcess : Benchmark
+{
+    BenchmarkInOtherProcess(BenchmarkCategories type, Benchmark::RangeOfArguments range, interned_string executable, int index_in_executable);
+    void Run(State & state) const override;
+};
 
 bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[]);
+std::optional<std::string> LoadAllBenchmarksFromFile(std::string_view filename);
 }
 
 #define SKB_CONCAT2(a, b) a ## b
@@ -299,4 +326,5 @@ bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[]);
 
 #define SKA_BENCHMARK_CATEGORIES(...) (new ::skb::LambdaBenchmark(__VA_ARGS__))
 #define SKA_BENCHMARK_NAME(function, category, name) (new ::skb::LambdaBenchmark(function, { category, name }))
-#define SKA_BENCHMARK(category, function_name) static ::skb::Benchmark * SKB_CONCAT(register_benchmark_, __LINE__) = SKA_BENCHMARK_NAME(&function_name, category, #function_name)
+#define SKA_BENCHMARK_REGISTER(category, function_name) SKA_BENCHMARK_NAME(&function_name, category, #function_name)
+#define SKA_BENCHMARK(category, function_name) static ::skb::Benchmark * SKB_CONCAT(register_benchmark_, __LINE__) = SKA_BENCHMARK_REGISTER(category, function_name)

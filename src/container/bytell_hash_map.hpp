@@ -21,6 +21,8 @@
 #else
 #define SKA_NOINLINE(...) __VA_ARGS__ __attribute__((noinline))
 #endif
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
 
 namespace ska
 {
@@ -1526,3 +1528,4 @@ public:
 };
 
 } // end namespace ska
+#pragma GCC diagnostic pop

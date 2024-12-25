@@ -2,6 +2,7 @@
 
 #include <vector>
 #include "math/powers_of_two.hpp"
+#include <stddef.h>
 
 template<size_t Base>
 float HaltonValue(size_t i)

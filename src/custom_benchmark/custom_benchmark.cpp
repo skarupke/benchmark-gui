@@ -7,12 +7,17 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sstream>
+#include <charconv>
 
 namespace skb
 {
 int global_counter = 0;
 float global_float = 0.0f;
 double global_double = 0.0;
+
+const char * const LIST_ALL_BENCHMARKS = "--list-all-benchmarks";
+const char * const RUN_BENCHMARK_THEN_EXIT = "--run-benchmark-then-exit";
 
 const float BenchmarkResults::default_run_time = 0.25f;
 
@@ -37,6 +42,7 @@ const interned_string & BenchmarkCategories::CompilerIndex()
     static const interned_string result = "compiler";
     return result;
 }
+BenchmarkCategories::BenchmarkCategories() = default;
 BenchmarkCategories::BenchmarkCategories(interned_string type, interned_string name)
 {
     categories[TypeIndex()] = std::move(type);
@@ -63,8 +69,22 @@ const interned_string & BenchmarkCategories::GetCompiler() const
 
 void BenchmarkCategories::AddCategory(interned_string category, interned_string value)
 {
+    CHECK_FOR_PROGRAMMER_ERROR(category.view().find('\n') == std::string::npos);
+    CHECK_FOR_PROGRAMMER_ERROR(value.view().find('\n') == std::string::npos);
     CHECK_FOR_PROGRAMMER_ERROR(categories.find(category) == categories.end());
     categories.emplace(std::move(category), std::move(value));
+}
+BenchmarkCategories BenchmarkCategories::AddCategoryCopy(interned_string category, interned_string value) const &
+{
+    BenchmarkCategories copy = *this;
+    copy.AddCategory(category, value);
+    return copy;
+}
+BenchmarkCategories BenchmarkCategories::AddCategoryCopy(interned_string category, interned_string value) &&
+{
+    BenchmarkCategories copy = std::move(*this);
+    copy.AddCategory(category, value);
+    return copy;
 }
 
 struct NestedPointerLess : interned_string::pointer_less
@@ -86,6 +106,10 @@ struct NestedPointerLess : interned_string::pointer_less
 bool BenchmarkCategories::operator<(const BenchmarkCategories & other) const
 {
     return std::lexicographical_compare(categories.begin(), categories.end(), other.categories.begin(), other.categories.end(), NestedPointerLess());
+}
+bool BenchmarkCategories::operator==(const BenchmarkCategories & other) const
+{
+    return categories == other.categories;
 }
 
 CategoryBuilder CategoryBuilder::AddCategory(interned_string category, interned_string value) const &
@@ -132,38 +156,46 @@ std::map<interned_string, std::vector<BenchmarkResults *>, interned_string::poin
     return result;
 }
 
-Benchmark::Benchmark(BenchmarkCategories categories)
-{
-    for (const interned_string & compiler : AllCompilers())
-    {
-        BenchmarkCategories compiler_categories = categories;
-        compiler_categories.AddCategory(BenchmarkCategories::CompilerIndex(), compiler);
-        AddToAllBenchmarks(compiler_categories);
-    }
-}
-
 static std::vector<BenchmarkResults *> & AllBenchmarksNumbered()
 {
     static std::vector<BenchmarkResults *> result;
     return result;
 }
 
-void Benchmark::AddToAllBenchmarks(const BenchmarkCategories & categories)
+Benchmark::Benchmark(BenchmarkCategories categories)
 {
-    auto added = AllBenchmarks().emplace(categories, this);
-    CHECK_FOR_PROGRAMMER_ERROR(added.second);
-    added.first->second.categories = &added.first->first;
+    for (const interned_string & compiler : AllCompilers())
+    {
+        BenchmarkCategories compiler_categories = categories;
+        compiler_categories.AddCategory(BenchmarkCategories::CompilerIndex(), compiler);
+        skb::BenchmarkResults * new_results = AddToAllBenchmarks(compiler_categories);
+        new_results->my_global_index = AllBenchmarksNumbered().size();
+        AllBenchmarksNumbered().push_back(new_results);
+    }
+}
+Benchmark::Benchmark(BenchmarkCategories type, interned_string executable, int index_in_executable)
+{
+    skb::BenchmarkResults * new_results = AddToAllBenchmarks(type);
+    new_results->executable = executable;
+    new_results->my_global_index = index_in_executable;
+}
+
+skb::BenchmarkResults * Benchmark::AddToAllBenchmarks(const BenchmarkCategories & categories)
+{
+    auto [added, did_add] = AllBenchmarks().emplace(categories, this);
+    CHECK_FOR_PROGRAMMER_ERROR(did_add);
+    skb::BenchmarkResults * new_results = &added->second;
+    new_results->categories = &added->first;
     for (const auto & category : categories.GetCategories())
     {
-        RAW_VERIFY(AllCategories()[category.first][category.second].insert(&added.first->second).second);
+        RAW_VERIFY(AllCategories()[category.first][category.second].insert(new_results).second);
     }
     if (categories.GetType() == "baseline")
     {
-        AllBaselineBenchmarks()[categories.GetName()].push_back(&added.first->second);
+        AllBaselineBenchmarks()[categories.GetName()].push_back(new_results);
     }
-    added.first->second.my_global_index = AllBenchmarksNumbered().size();
-    AllBenchmarksNumbered().push_back(&added.first->second);
-    results.push_back(&added.first->second);
+    results.push_back(new_results);
+    return new_results;
 }
 
 Benchmark * Benchmark::SetBaseline(interned_string name_of_baseline_benchmark)
@@ -216,6 +248,77 @@ std::string BenchmarkCategories::CategoriesString() const
     CHECK_FOR_PROGRAMMER_ERROR(result.size() == total_length);
     return result;
 }
+
+std::string EscapeString(std::string_view str)
+{
+    std::string result;
+    result.reserve(str.size() + std::count_if(str.begin(), str.end(), [](char c)
+    {
+         return c == '\\' || c == '"';
+    }));
+    for (char c : str) {
+        if (c == '\\' || c == '"') {
+            result.push_back('\\');
+        }
+        result.push_back(c);
+    }
+    return result;
+}
+std::string UnescapeString(std::string_view str)
+{
+    std::string result(str);
+    result.erase(std::remove_if(result.begin(), result.end(), [last_was_backslash = false](char c) mutable {
+        if (c == '\\') {
+            last_was_backslash = !last_was_backslash;
+        } else {
+            last_was_backslash = false;
+        }
+        return last_was_backslash;
+    }), result.end());
+    return result;
+}
+
+std::string BenchmarkCategories::Serialize() const
+{
+    std::stringstream str;
+    bool first = true;
+    for (const auto& [category, value] : categories)
+    {
+        if (first) first = false;
+        else str << ',';
+        str << '"' << EscapeString(category) << "\":\"" << EscapeString(value) << '"';
+    }
+    return str.str();
+}
+size_t EndOfEscapedString(std::string_view str, size_t start = 0) {
+    bool last_was_backslash = false;
+    for (; start < str.size(); ++start) {
+        char c = str[start];
+        if (c == '\\') {
+            last_was_backslash = !last_was_backslash;
+        } else if (!last_was_backslash && c == '"') {
+            return start;
+        } else {
+            last_was_backslash = false;
+        }
+    }
+    return str.size();
+}
+BenchmarkCategories BenchmarkCategories::Deserialize(std::string_view str)
+{
+    BenchmarkCategories result;
+    size_t start = 0;
+    while (start < str.size()) {
+        size_t end = EndOfEscapedString(str, start + 1);
+        interned_string category(UnescapeString(str.substr(start + 1, end - start - 1)));
+        size_t end_of_value = EndOfEscapedString(str, end + 3);
+        interned_string value(UnescapeString(str.substr(end + 3, end_of_value - end - 3)));
+        result.AddCategory(category, value);
+        start = end_of_value + 2;
+    }
+    return result;
+}
+
 
 Benchmark::~Benchmark()
 {
@@ -282,6 +385,40 @@ std::vector<int> Benchmark::GetAllArguments() const
     }
     return all_arguments;
 }
+
+Benchmark::RangeOfArguments Benchmark::GetArgumentRange() const
+{
+    return { range_begin, range_end, range_multiplier };
+}
+std::string Benchmark::RangeOfArguments::Serialize() const
+{
+    char buffer[128];
+    auto [ptr, err] = std::to_chars(std::begin(buffer), std::end(buffer), multiplier);
+    std::stringstream result;
+    result << begin << ',' << end << ',' << std::string_view(buffer, ptr);
+    return result.str();
+}
+
+template<typename I>
+bool StrToNumber(std::string_view str, I & to_fill)
+{
+    std::from_chars_result result = std::from_chars(str.data(), str.data() + str.size(), to_fill);
+    return result.ptr != str.data() && result.ptr == str.data() + str.size();
+}
+Benchmark::RangeOfArguments Benchmark::RangeOfArguments::Deserialize(std::string_view str)
+{
+    auto end = str.data() + str.size();
+    auto first_comma = std::find(str.data(), end, ',');
+    int range_begin;
+    RAW_VERIFY(StrToNumber({str.data(), first_comma}, range_begin));
+    auto second_comma = std::find(first_comma + 1, end, ',');
+    int range_end;
+    RAW_VERIFY(StrToNumber({first_comma + 1, second_comma}, range_end));
+    double range_multiplier;
+    RAW_VERIFY(StrToNumber({second_comma + 1, end}, range_multiplier));
+    return { range_begin, range_end, range_multiplier };
+}
+
 
 std::map<BenchmarkCategories, BenchmarkResults> & Benchmark::AllBenchmarks()
 {
@@ -446,13 +583,6 @@ bool string_starts_with(std::string_view to_check, std::string_view start)
             std::mismatch(to_check.begin(), to_check.end(), start.begin(), start.end()).second == start.end();
 }
 
-template<typename I>
-bool StrToInt(std::string_view str, I & to_fill)
-{
-    std::from_chars_result result = std::from_chars(str.data(), str.data() + str.size(), to_fill);
-    return result.ptr != str.data() && result.ptr == str.data() + str.size();
-}
-
 
 void check_for_error(int result)
 {
@@ -472,28 +602,24 @@ std::string read_pipe(int pipe)
         else if (num_read == -1)
             check_for_error(num_read);
         else
-        {
             result.append(buffer, buffer + num_read);
-        }
     }
     check_for_error(close(pipe));
     return result;
 }
 
-RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int argument)
+struct ChildProcessOutput {
+    int return_code;
+    std::string stdout;
+};
+
+ChildProcessOutput RunProcess(const std::vector<std::string> & arguments, bool forward_stderr)
 {
     int communication_pipe[2] = { 0, 0 };
     check_for_error(pipe(communication_pipe));
-    std::vector<std::string> arguments;
-    arguments.push_back(my_executable_name);
-    arguments.push_back("--run-benchmark-then-exit");
-    arguments.push_back(std::to_string(my_global_index));
-    arguments.push_back(std::string(categories->GetName().view()));
-    arguments.push_back(std::to_string(argument));
-    arguments.push_back(std::to_string(num_iterations));
     std::vector<char *> as_char_pointers;
     as_char_pointers.reserve(arguments.size());
-    for (std::string & str : arguments)
+    for (const std::string & str : arguments)
         as_char_pointers.push_back(const_cast<char *>(str.c_str()));
     as_char_pointers.push_back(nullptr);
     pid_t pid = vfork();
@@ -502,13 +628,15 @@ RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int argument)
     {
         check_for_error(close(communication_pipe[0]));
         check_for_error(dup2(communication_pipe[1], STDOUT_FILENO));
+        if (forward_stderr)
+            check_for_error(dup2(communication_pipe[1], STDERR_FILENO));
         check_for_error(close(communication_pipe[1]));
 
         std::filesystem::current_path(initial_working_dir);
-        execv(my_executable_name.c_str(), as_char_pointers.data());
+        execv(arguments[0].c_str(), as_char_pointers.data());
         // exec will only return if something goes wrong
         const char * error_str = strerror(errno);
-        std::cout << "Error: Couldn't launch executable " << my_executable_name << ". Error was " << error_str << std::endl;
+        std::cout << "Error: Couldn't launch executable " << arguments[0] << ". Error was " << error_str << std::endl;
         exit(1);
     }
     check_for_error(close(communication_pipe[1]));
@@ -516,6 +644,22 @@ RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int argument)
     int child_return_code = 0;
     pid_t waited = waitpid(pid, &child_return_code, 0);
     CHECK_FOR_PROGRAMMER_ERROR(waited == pid);
+    return { child_return_code, result };
+}
+
+RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int argument)
+{
+    std::vector<std::string> arguments;
+    if (this->executable.view().empty())
+        arguments.push_back(my_executable_name);
+    else
+        arguments.push_back(std::string(executable.view()));
+    arguments.push_back(RUN_BENCHMARK_THEN_EXIT);
+    arguments.push_back(std::to_string(my_global_index));
+    arguments.push_back(std::string(categories->GetName().view()));
+    arguments.push_back(std::to_string(argument));
+    arguments.push_back(std::to_string(num_iterations));
+    auto [child_return_code, result] = RunProcess(arguments, false);
     CHECK_FOR_PROGRAMMER_ERROR(WIFEXITED(child_return_code) && WEXITSTATUS(child_return_code) == 0);
     size_t num_iterations_start = result.find(subprocess_num_iterations_string);
     CHECK_FOR_PROGRAMMER_ERROR(num_iterations_start != std::string::npos);
@@ -526,13 +670,13 @@ RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int argument)
     size_t num_bytes_start = result.find(subprocess_num_bytes_string, num_items_start + subprocess_num_items_string.size());
     CHECK_FOR_PROGRAMMER_ERROR(num_bytes_start != std::string::npos);
     int actual_num_iterations = 0;
-    RAW_VERIFY(StrToInt({ result.data() + num_iterations_start + subprocess_num_iterations_string.size(), time_start - num_iterations_start - subprocess_num_iterations_string.size() }, actual_num_iterations));
+    RAW_VERIFY(StrToNumber({ result.data() + num_iterations_start + subprocess_num_iterations_string.size(), time_start - num_iterations_start - subprocess_num_iterations_string.size() }, actual_num_iterations));
     std::chrono::nanoseconds::rep time = 0;
-    RAW_VERIFY(StrToInt({ result.data() + time_start + subprocess_time_string.size(), num_items_start - time_start - subprocess_time_string.size() }, time));
+    RAW_VERIFY(StrToNumber({ result.data() + time_start + subprocess_time_string.size(), num_items_start - time_start - subprocess_time_string.size() }, time));
     size_t num_items_processed = 0;
-    RAW_VERIFY(StrToInt({ result.data() + num_items_start + subprocess_num_items_string.size(), num_bytes_start - num_items_start - subprocess_num_items_string.size() }, num_items_processed));
+    RAW_VERIFY(StrToNumber({ result.data() + num_items_start + subprocess_num_items_string.size(), num_bytes_start - num_items_start - subprocess_num_items_string.size() }, num_items_processed));
     size_t num_bytes_used = 0;
-    RAW_VERIFY(StrToInt({ result.data() + num_bytes_start + subprocess_num_bytes_string.size(), result.size() - 1 - num_bytes_start - subprocess_num_bytes_string.size() }, num_bytes_used));
+    RAW_VERIFY(StrToNumber({ result.data() + num_bytes_start + subprocess_num_bytes_string.size(), result.size() - 1 - num_bytes_start - subprocess_num_bytes_string.size() }, num_bytes_used));
     return { actual_num_iterations, argument, std::chrono::nanoseconds(time), num_items_processed, num_bytes_used };
 }
 
@@ -572,6 +716,98 @@ void LambdaBenchmark::Run(State & state) const
     return function(state);
 }
 
+BenchmarkInOtherProcess::BenchmarkInOtherProcess(BenchmarkCategories type, Benchmark::RangeOfArguments range, interned_string executable, int index_in_executable)
+    : Benchmark(std::move(type), executable, index_in_executable)
+{
+    SetRange(range.begin, range.end);
+    SetRangeMultiplier(range.multiplier);
+    for (BenchmarkResults * results : results) {
+        for (int i : GetAllArguments()) {
+            results->results[i];
+        }
+    }
+}
+
+void BenchmarkInOtherProcess::Run(State &) const
+{
+    CHECK_FOR_PROGRAMMER_ERROR(!"This should never be called. I know the types don't make sense");
+}
+
+
+void ListAllBenchmarks()
+{
+    std::cout << "V1\n";
+    for (const BenchmarkResults * benchmark : AllBenchmarksNumbered())
+    {
+        if (benchmark->baseline_results) {
+            std::cout << "BenchmarkWithBaseline\n"
+                      << benchmark->benchmark->GetArgumentRange().Serialize() << '\n'
+                      << benchmark->categories->Serialize() << '\n'
+                      << benchmark->baseline_results->categories->GetName().view() << '\n';
+        } else {
+            std::cout << "BenchmarkWithoutBaseline\n"
+                      << benchmark->benchmark->GetArgumentRange().Serialize() << '\n'
+                      << benchmark->categories->Serialize() << '\n';
+        }
+    }
+    std::cout.flush();
+}
+
+std::vector<std::string> SplitString(const std::string & str, char to_split)
+{
+    std::vector<std::string> result;
+    for (size_t i = 0, found = str.find(to_split);;) {
+        result.push_back(str.substr(i, found - i));
+        if (found == std::string::npos)
+            break;
+        i = found + 1;
+        found = str.find(to_split, i);
+    }
+    return result;
+}
+
+std::vector<std::unique_ptr<BenchmarkInOtherProcess>> benchmarks_in_other_files;
+void LoadAllBenchmarks(interned_string executable, const std::string & run_results)
+{
+    std::vector<std::string> lines = SplitString(run_results, '\n');
+    CHECK_FOR_INVALID_DATA(lines[0] == "V1");
+    std::vector<std::pair<size_t, interned_string>> baseline_to_fill_in;
+    int benchmark_index_in_other_file = 0;
+    for (size_t line = 1;; ++benchmark_index_in_other_file) {
+        if (line == lines.size() || (line == lines.size() - 1 && lines[line].empty()))
+            break;
+        CHECK_FOR_INVALID_DATA(lines.size() > line + 2);
+        Benchmark::RangeOfArguments range = Benchmark::RangeOfArguments::Deserialize(lines[line + 1]);
+        BenchmarkCategories categories = BenchmarkCategories::Deserialize(lines[line + 2]);
+        if (lines[line] == "BenchmarkWithBaseline") {
+            CHECK_FOR_INVALID_DATA(lines.size() > line + 3);
+            baseline_to_fill_in.emplace_back(benchmarks_in_other_files.size(), lines[line + 3]);
+            line += 4;
+        } else if (lines[line] == "BenchmarkWithoutBaseline") {
+            line += 3;
+        } else {
+            CHECK_FOR_INVALID_DATA(!"Got wrong line", lines[line]);
+        }
+        benchmarks_in_other_files.push_back(std::make_unique<BenchmarkInOtherProcess>(std::move(categories), range, executable, benchmark_index_in_other_file));
+    }
+    for (const auto & [index, baseline] : baseline_to_fill_in) {
+        benchmarks_in_other_files[index]->SetBaseline(baseline);
+    }
+}
+
+std::optional<std::string> LoadAllBenchmarksFromFile(std::string_view executable)
+{
+    std::vector<std::string> arguments;
+    arguments.emplace_back(executable);
+    arguments.emplace_back(LIST_ALL_BENCHMARKS);
+    auto [child_return_code, result] = RunProcess(arguments, true);
+    if (!WIFEXITED(child_return_code) || WEXITSTATUS(child_return_code) != 0) {
+        return {"Error running child process: " + result};
+    }
+    LoadAllBenchmarks(interned_string(executable), result);
+    return std::nullopt;
+}
+
 bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[])
 {
     if (argc < 1)
@@ -580,7 +816,12 @@ bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[])
     initial_working_dir = std::filesystem::current_path();
     if (argc < 2)
         return false;
-    if (std::strcmp(argv[1], "--run-benchmark-then-exit") != 0)
+    if (std::strcmp(argv[1], LIST_ALL_BENCHMARKS) == 0)
+    {
+        ListAllBenchmarks();
+        return true;
+    }
+    else if (std::strcmp(argv[1], RUN_BENCHMARK_THEN_EXIT) != 0)
         return false;
     if (argc < 6)
     {
@@ -589,7 +830,7 @@ bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[])
     }
     const std::vector<BenchmarkResults *> & all_benchmarks = AllBenchmarksNumbered();
     int index = 0;
-    if (!StrToInt(argv[2], index))
+    if (!StrToNumber(argv[2], index))
     {
         std::cout << "Error parsing the benchmark index" << std::endl;
         return true;
@@ -611,24 +852,25 @@ bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[])
         return true;
     }
     int argument = 0;
-    if (!StrToInt(argv[4], argument))
+    if (!StrToNumber(argv[4], argument))
     {
         std::cout << "Error parsing the benchmark argument" << std::endl;
         return true;
     }
     int iteration_count = 0;
-    if (!StrToInt(argv[5], iteration_count))
+    if (!StrToNumber(argv[5], iteration_count))
     {
         std::cout << "Error parsing the benchmark iteration count" << std::endl;
         return true;
     }
 
     skb::State benchmark_state(iteration_count, argument);
+    std::cout << subprocess_start_string << argv[3] << subprocess_num_iterations_string << iteration_count;
+    std::cout.flush();
     benchmark->benchmark->Run(benchmark_state);
     RunResults results = benchmark_state.GetResults();
 
-    std::cout << subprocess_start_string << argv[3] << subprocess_num_iterations_string << results.num_iterations
-              << subprocess_time_string << results.time.count()
+    std::cout << subprocess_time_string << results.time.count()
               << subprocess_num_items_string << results.num_items_processed
               << subprocess_num_bytes_string << results.num_bytes_used
               << '\n';
@@ -636,4 +878,38 @@ bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[])
     return true;
 }
 
+}
+
+#include "test/include_test.hpp"
+TEST(benchmark_serialize, roundtrip) {
+    skb::BenchmarkCategories a("Hello", "World");
+    {
+        std::string str = a.Serialize();
+        skb::BenchmarkCategories b = skb::BenchmarkCategories::Deserialize(str);
+        ASSERT_EQ(a, b);
+    }
+    a.AddCategory("foo", "bar");
+    {
+        std::string str = a.Serialize();
+        skb::BenchmarkCategories b = skb::BenchmarkCategories::Deserialize(str);
+        ASSERT_EQ(a, b);
+    }
+    a.AddCategory("\" \\\"", "\\\"\"\\");
+    {
+        std::string str = a.Serialize();
+        skb::BenchmarkCategories b = skb::BenchmarkCategories::Deserialize(str);
+        ASSERT_EQ(a, b);
+    }
+    a.AddCategory(",,,", ":::");
+    std::string str = a.Serialize();
+    skb::BenchmarkCategories b = skb::BenchmarkCategories::Deserialize(str);
+    ASSERT_EQ(a, b);
+}
+TEST(benchmark_serialize, split_string)
+{
+    ASSERT_EQ(std::vector<std::string>({"a"}), skb::SplitString("a", '-'));
+    ASSERT_EQ(std::vector<std::string>({"a", "bcd"}), skb::SplitString("a-bcd", '-'));
+    ASSERT_EQ(std::vector<std::string>({"a", "", "bcd"}), skb::SplitString("a--bcd", '-'));
+    ASSERT_EQ(std::vector<std::string>({"a", "", "bcd", "e"}), skb::SplitString("a--bcd-e", '-'));
+    ASSERT_EQ(std::vector<std::string>({"a", "", "bcd", "e", ""}), skb::SplitString("a--bcd-e-", '-'));
 }

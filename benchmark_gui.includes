@@ -75,3 +75,4 @@ libs/boost_ska_sort/sort/heap_sort
 libs/boost_ska_sort/sort/sample_sort
 libs/boost_ska_sort/sort/spinsort
 src/sorting_benchmarks
+libs/Gamma234Heap/Deap

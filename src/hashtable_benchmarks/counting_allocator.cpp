@@ -1,9 +1,9 @@
 #include "hashtable_benchmarks/counting_allocator.hpp"
 
-thread_local size_t counting_allocator_stats::num_allocated = 0;
-thread_local size_t counting_allocator_stats::num_freed = 0;
-thread_local size_t counting_allocator_stats::num_bytes_allocated = 0;
-thread_local size_t counting_allocator_stats::num_bytes_freed = 0;
+thread_local std::size_t counting_allocator_stats::num_allocated = 0;
+thread_local std::size_t counting_allocator_stats::num_freed = 0;
+thread_local std::size_t counting_allocator_stats::num_bytes_allocated = 0;
+thread_local std::size_t counting_allocator_stats::num_bytes_freed = 0;
 
 
 

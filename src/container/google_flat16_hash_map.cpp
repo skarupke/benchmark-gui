@@ -7,6 +7,7 @@ static_assert(std::is_nothrow_move_assignable<ska::google_flat16_hash_map<int, i
 #include <gtest/gtest.h>
 #include <random>
 #include <map>
+#include <memory>
 
 TEST(sherwood_v12, insert_and_find)
 {

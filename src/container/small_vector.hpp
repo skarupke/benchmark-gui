@@ -29,7 +29,7 @@ using small_vector = typename detail::small_vector_typedef<T, SmallSize, Allocat
 template<typename T, size_t SmallSize, typename Allocator>
 struct small_inplace_vector : private Allocator
 {
-    static constexpr size_t NumInplace = std::max(SmallSize, sizeof(T *) / sizeof(T));
+    static constexpr size_t NumInplace = std::max(SmallSize, sizeof(void *) / sizeof(T));
 private:
     T * _begin;
     T * _end;

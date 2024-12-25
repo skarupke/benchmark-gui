@@ -40,7 +40,7 @@ std::pair<SqLiteStatement, StringView<const char>> SqLite::prepare(StringView<co
         UNHANDLED_ERROR("couldn't prepare a statement. should pass the error up the callstack");
         return {SqLiteStatement(), text};
     }
-    return {SqLiteStatement(statement), {remainder, text.end()}};
+    return {SqLiteStatement(statement), StringView<const char>{remainder, text.end()}};
 }
 
 bool SqLiteStatement::step()

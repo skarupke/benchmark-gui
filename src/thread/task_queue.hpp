@@ -3,7 +3,7 @@
 #include <functional>
 #include <future>
 #include <type_traits>
-#include <dispatch/dispatch.h>
+//#include <dispatch/dispatch.h>
 #include <deque>
 #include <vector>
 #include <thread>
@@ -11,7 +11,7 @@
 #include "thread/custom_mutex.hpp"
 #include "thread/blockingconcurrentqueue.h"
 
-template<typename Function, typename... Args>
+/*template<typename Function, typename... Args>
 auto dispatch_async(Function && f, Args &&... args)
 {
     using result_type = std::result_of_t<std::decay_t<Function>(std::decay_t<Args>...)>;
@@ -27,7 +27,7 @@ auto dispatch_async(Function && f, Args &&... args)
         delete p;
     });
     return result;
-}
+}*/
 
 struct notification_queue
 {

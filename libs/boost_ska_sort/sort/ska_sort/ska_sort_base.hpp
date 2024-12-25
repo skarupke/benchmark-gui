@@ -412,8 +412,8 @@ class ska_sort_impl : ska_sort_error_handling
                 ska_byte_sort<HasSortNext, count_type>(begin, num_elements, extract_byte, true, nullptr, partition_ends.data() + 1, nullptr);
             return;
         }
-        std::atomic<count_type> total_counts[256];
-        memset(total_counts, 0, sizeof(total_counts));
+        std::atomic<count_type> total_counts[256] = { 0 };
+        //memset(total_counts, 0, sizeof(total_counts));
         std::unique_ptr<PartitionData<count_type>[]> partition_ends(new PartitionData<count_type>[num_sub_sorts]);
         // todo: use parallel for
         std::vector<std::future<void>> async_futures;

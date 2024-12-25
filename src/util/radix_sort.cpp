@@ -2,6 +2,7 @@
 // Distributed under the Boost Software License, Version 1.0.
 //    (See http://www.boost.org/LICENSE_1_0.txt)
 
+#if 0
 #include "util/radix_sort.hpp"
 #include <deque>
 #include <optional>
@@ -2327,23 +2328,29 @@ void RegisterSorting()
 {
     skb::CategoryBuilder categories_so_far;
     RegisterSortForType<int>(categories_so_far, "int", "int");
-    RegisterSortForType<uint8_t>(categories_so_far, "uint8_t", "uint8_t");
+    //RegisterSortForType<uint8_t>(categories_so_far, "uint8_t", "uint8_t");
     RegisterSortForType<float>(categories_so_far, "float", "float");
-    RegisterSortForType<double>(categories_so_far, "double", "double");
+    //RegisterSortForType<double>(categories_so_far, "double", "double");
     RegisterSortForType<std::string>(categories_so_far, "string", "string");
-    RegisterSortForType<std::list<int>>(categories_so_far, "std::list", "std::list");
+    //RegisterSortForType<std::list<int>>(categories_so_far, "std::list", "std::list");
 
-    RegisterSortForType<IntWithPadding<8>>(categories_so_far.AddCategory("struct size", "8"), "int", "int_size_8");
+    //RegisterSortForType<IntWithPadding<8>>(categories_so_far.AddCategory("struct size", "8"), "int", "int_size_8");
     //RegisterSortForType<IntWithPadding<16>>(categories_so_far.AddCategory("struct size", "16"), "int", "int_size_16");
     //RegisterSortForType<IntWithPadding<32>>(categories_so_far.AddCategory("struct size", "32"), "int", "int_size_32");
-    RegisterSortForType<IntWithPadding<64>>(categories_so_far.AddCategory("struct size", "64"), "int", "int_size_64");
-    RegisterSortForType<IntWithPadding<256>>(categories_so_far.AddCategory("struct size", "256"), "int", "int_size_256");
-    RegisterSortForType<IntWithPadding<1024>>(categories_so_far.AddCategory("struct size", "1024"), "int", "int_size_1024");
+    //RegisterSortForType<IntWithPadding<64>>(categories_so_far.AddCategory("struct size", "64"), "int", "int_size_64");
+    //RegisterSortForType<IntWithPadding<256>>(categories_so_far.AddCategory("struct size", "256"), "int", "int_size_256");
+    //RegisterSortForType<IntWithPadding<1024>>(categories_so_far.AddCategory("struct size", "1024"), "int", "int_size_1024");
     RegisterStdSort();
     RegisterBoostSorts();
     RegisterRegionsSort();
     RegisterLearnedSort();
 }
 
+#endif
+
+#else
+void RegisterSorting()
+{
+}
 #endif
 

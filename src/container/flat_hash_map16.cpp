@@ -7,6 +7,7 @@ static_assert(std::is_nothrow_move_assignable<ska::flat16_hash_map<int, int> >::
 #include <gtest/gtest.h>
 #include <random>
 #include <map>
+#include <memory>
 
 TEST(flat_hash_map16, metadata)
 {

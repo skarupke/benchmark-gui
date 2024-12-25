@@ -2,6 +2,7 @@ build-clang/tup.config
 build-clang-debug/tup.config
 build-gcc/tup.config
 build-gcc-debug/tup.config
+libs/Gamma234Heap/Deap/Deap.h
 libs/Raduls/comp_and_swap.h
 libs/Raduls/comp_and_swap.h
 libs/Raduls/defs.h
@@ -2623,6 +2624,8 @@ src/container/flat_hash_map16.cpp
 src/container/flat_hash_map16.cpp
 src/container/flat_hash_map16.hpp
 src/container/flat_hash_map16.hpp
+src/container/flat_hash_map2.cpp
+src/container/flat_hash_map2.hpp
 src/container/google_block_hash_map.cpp
 src/container/google_block_hash_map.cpp
 src/container/google_block_hash_map.hpp
@@ -2635,6 +2638,8 @@ src/container/inplace_linear_search_map.cpp
 src/container/inplace_linear_search_map.cpp
 src/container/inplace_linear_search_map.hpp
 src/container/inplace_linear_search_map.hpp
+src/container/knuth_multiset.cpp
+src/container/knuth_multiset.hpp
 src/container/libc++__hash_table.hpp
 src/container/libc++__hash_table.hpp
 src/container/libc++_unordered_map.cpp
@@ -2842,6 +2847,8 @@ src/thread/concurrentqueue.h
 src/thread/custom_mutex.cpp
 src/thread/custom_mutex.hpp
 src/thread/lightweightsemaphore.h
+src/thread/one_byte_mutex.cpp
+src/thread/one_byte_mutex.hpp
 src/thread/task_queue.cpp
 src/thread/task_queue.hpp
 src/util/algorithm.cpp
@@ -4996,6 +5003,9 @@ src/test/include_test.hpp
 src/test/wrap_catch.hpp
 src/util/algorithm.cpp
 src/util/algorithm.hpp
+src/util/binary_search.cpp
+src/util/binary_search.hpp
+src/util/binary_search_erthink.hpp
 src/util/forwarding_constructor.hpp
 src/util/function.cpp
 src/util/function.hpp

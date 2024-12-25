@@ -1,7 +1,8 @@
 #include "custom_benchmark/main_gui.hpp"
-#include "QAction"
-#include "QLabel"
+#include <QAction>
+#include <QLabel>
 #include <QMessageBox>
+#include <QFileDialog>
 
 BenchmarkMainGui::CategoryCheckboxes::CategoryCheckboxes(interned_string tmp_category)
     : category(std::move(tmp_category)), no_setting_checkbox("None")
@@ -29,7 +30,8 @@ BenchmarkMainGui::CategoryCheckboxes::CategoryCheckboxes(interned_string tmp_cat
 }
 
 BenchmarkMainGui::BenchmarkMainGui()
-    : run_current("Run Current")
+    : add_benchmarks("Add Benchmark Executable")
+    , run_current("Run Current")
     , reset_current("Delete Current Results")
     , normalize_checkbox("Normalize For Memory")
     , draw_points_checkbox("Draw as Points")
@@ -38,31 +40,49 @@ BenchmarkMainGui::BenchmarkMainGui()
     , xlimit("0")
 {
     setLayout(&layout);
-    QGridLayout * checkboxes_layout = new QGridLayout();
 
-    for (const auto & category : skb::Benchmark::AllCategories())
-    {
-        category_checkboxes.emplace(category.first, category.first);
-    }
-    size_t layout_index = 0;
-    for (auto & added : category_checkboxes)
-    {
-        CategoryCheckboxes & checkboxes = added.second;
-        if (added.first == skb::BenchmarkCategories::NameIndex())
+    auto init_checkboxes = [this] {
+        category_checkboxes.clear();
+        checkboxes_widget = std::make_unique<QWidget>();
+        for (const auto & category : skb::Benchmark::AllCategories())
         {
-            benchmark_checkbox_area.setWidget(&checkboxes.parent);
-            checkboxes.parent.setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+            category_checkboxes.emplace(category.first, category.first);
         }
-        else
-            checkboxes_layout->addWidget(&checkboxes.parent, 0, ++layout_index, Qt::AlignTop | Qt::AlignLeft);
-        QObject::connect(&checkboxes.no_setting_checkbox, &QCheckBox::stateChanged, this, &BenchmarkMainGui::OnCategoryChanged);
-        for (auto & checkbox : checkboxes.checkboxes)
+        QGridLayout * checkboxes_layout = new QGridLayout();
+        size_t layout_index = 0;
+        for (auto & added : category_checkboxes)
         {
-            QObject::connect(&checkbox.second, &QCheckBox::stateChanged, this, &BenchmarkMainGui::OnCategoryChanged);
+            CategoryCheckboxes & checkboxes = added.second;
+            if (added.first == skb::BenchmarkCategories::NameIndex())
+            {
+                benchmark_checkbox_area.setWidget(&checkboxes.parent);
+                checkboxes.parent.setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+            }
+            else
+                checkboxes_layout->addWidget(&checkboxes.parent, 0, ++layout_index, Qt::AlignTop | Qt::AlignLeft);
+            QObject::connect(&checkboxes.no_setting_checkbox, &QCheckBox::stateChanged, this, &BenchmarkMainGui::OnCategoryChanged);
+            for (auto & checkbox : checkboxes.checkboxes)
+            {
+                QObject::connect(&checkbox.second, &QCheckBox::stateChanged, this, &BenchmarkMainGui::OnCategoryChanged);
+            }
         }
-    }
-    category_checkboxes.at(skb::BenchmarkCategories::TypeIndex()).checkboxes.at("baseline").setChecked(false);
+        category_checkboxes.at(skb::BenchmarkCategories::TypeIndex()).checkboxes.at("baseline").setChecked(false);
+        checkboxes_layout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding), 0, category_checkboxes.size() + 1, Qt::AlignLeft);
+        checkboxes_widget->setLayout(checkboxes_layout);
+        category_checkbox_area.setWidget(checkboxes_widget.get());
+    };
+    init_checkboxes();
 
+    QObject::connect(&add_benchmarks, &QPushButton::clicked, this, [this, init_checkboxes](bool){
+        QString result = QFileDialog::getOpenFileName(this, "Select an executable with benchmarks in it", ".", "Executables (*.exe)");
+        QByteArray as_utf8 = result.toUtf8();
+        std::string as_string(as_utf8.begin(), as_utf8.end());
+        if (auto error = skb::LoadAllBenchmarksFromFile(as_string)) {
+            std::string error_message = "There was an error loading the benchmarks:\n" + *error;
+            QMessageBox::critical(this, "Failed to Load Benchmarks", QString::fromUtf8(error_message.data(), error_message.size()), QMessageBox::Ok);
+        }
+        init_checkboxes();
+    });
     QObject::connect(&run_current, &QPushButton::clicked, this, [&](bool)
     {
         RunBenchmarkFirst(BenchmarksForCurrentCheckboxes().benchmarks);
@@ -94,10 +114,6 @@ BenchmarkMainGui::BenchmarkMainGui()
     });
     xlimit.setText("10000000");
 
-    checkboxes_layout->addItem(new QSpacerItem(0, 0, QSizePolicy::Expanding), 0, category_checkboxes.size() + 1, Qt::AlignLeft);
-    QWidget * checkboxes_parent_widget = new QWidget();
-    checkboxes_parent_widget->setLayout(checkboxes_layout);
-    category_checkbox_area.setWidget(checkboxes_parent_widget);
     category_checkbox_area.setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     category_checkbox_area.setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     category_checkbox_area.setFrameShape(QFrame::NoFrame);
@@ -109,14 +125,16 @@ BenchmarkMainGui::BenchmarkMainGui()
     layout.addWidget(&category_checkbox_area, 0, 0, 1, 2);
     layout.addWidget(&graph, 1, 0);
     QGridLayout * rhs_layout = new QGridLayout();
-    rhs_layout->addWidget(&benchmark_checkbox_area, 0, 0);
-    rhs_layout->addWidget(&xlimit, 1, 0);
-    rhs_layout->addWidget(&run_current, 2, 0);
-    rhs_layout->addWidget(&normalize_checkbox, 3, 0);
-    rhs_layout->addWidget(&draw_points_checkbox, 4, 0);
-    rhs_layout->addWidget(&prefer_visible_checkbox, 5, 0);
-    rhs_layout->addWidget(&profile_mode, 6, 0);
-    rhs_layout->addWidget(&reset_current, 7, 0);
+    int row = 0;
+    rhs_layout->addWidget(&add_benchmarks, row++, 0);
+    rhs_layout->addWidget(&benchmark_checkbox_area, row++, 0);
+    rhs_layout->addWidget(&xlimit, row++, 0);
+    rhs_layout->addWidget(&run_current, row++, 0);
+    rhs_layout->addWidget(&normalize_checkbox, row++, 0);
+    rhs_layout->addWidget(&draw_points_checkbox, row++, 0);
+    rhs_layout->addWidget(&prefer_visible_checkbox, row++, 0);
+    rhs_layout->addWidget(&profile_mode, row++, 0);
+    rhs_layout->addWidget(&reset_current, row++, 0);
     layout.addLayout(rhs_layout, 1, 1);
 }
 
@@ -220,7 +238,7 @@ BenchmarkMainGui::EnabledBoxes BenchmarkMainGui::BenchmarksForCurrentCheckboxes(
         {
             if (checkbox->isChecked())
                 return true;
-            if (enable_checkbox)
+            else if (enable_checkbox)
             {
                 matched = false;
                 return false;

@@ -4,6 +4,7 @@
 #include "debug/assert.hpp"
 #include <list>
 #include <cstring>
+#include <string>
 #include <boost/context/detail/prefetch.hpp>
 
 template<typename T>

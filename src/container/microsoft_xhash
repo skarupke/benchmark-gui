@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <tuple>
+#include <stdint.h>
 
  #pragma pack(push,_CRT_PACKING)
  #pragma warning(push,3)
@@ -386,8 +387,7 @@ public:
         _Unchecked_const_iterator;
 
     typedef std::vector<_Unchecked_iterator,
-		typename _Alty::template
-			rebind<_Unchecked_iterator>::other> _Myvec;
+        typename std::allocator_traits<_Alty>::template rebind_alloc<_Unchecked_iterator>> _Myvec;
 
     typedef std::pair<iterator, bool> _Pairib;
     typedef std::pair<iterator, iterator> _Pairii;

@@ -1,3 +1,4 @@
+#ifdef DONE_PULLING_OUT_BINARY
 #if 1
 #include <mutex>
 #include <thread>
@@ -852,6 +853,10 @@ struct two_byte_futex_mutex
 private:
     union int_union
     {
+        int_union()
+            : as_int(0)
+        {
+        }
         struct atomics
         {
             std::atomic<bool> fast_path;
@@ -5173,5 +5178,8 @@ RegisterBenchmarkWithAllMutexes(BenchmarkLongestIdle, ->Apply(CustomBenchmarkArg
 RegisterBenchmarkWithAllMutexes(BenchmarkLongestWait, ->Apply(CustomBenchmarkArguments));
 RegisterBenchmarkWithAllMutexes(BenchmarkContendedMutexMoreWork, ->Apply(CustomBenchmarkArguments));
 RegisterBenchmarkWithAllMutexes(BenchmarkContendedMutexMoreIdle, ->Apply(CustomBenchmarkArguments));
+void RegisterMutex() {}
+#endif
+#else
 void RegisterMutex() {}
 #endif

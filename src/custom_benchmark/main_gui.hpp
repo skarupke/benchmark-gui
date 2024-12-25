@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QLineEdit>
+#include <memory>
 
 class BenchmarkMainGui : public QWidget
 {
@@ -37,7 +38,9 @@ private:
     QScrollArea benchmark_checkbox_area;
     QScrollArea category_checkbox_area;
     QGridLayout layout;
+    std::unique_ptr<QWidget> checkboxes_widget;
 
+    QPushButton add_benchmarks;
     QPushButton run_current;
     QPushButton reset_current;
     QCheckBox normalize_checkbox;

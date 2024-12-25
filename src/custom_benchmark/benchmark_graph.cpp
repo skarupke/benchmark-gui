@@ -20,7 +20,17 @@ BenchmarkGraph::BenchmarkGraph(QWidget * parent)
     {
         if (mouse_press_highlighted)
         {
-            std::string for_clipboard = BuildClipboardString(*mouse_press_highlighted);
+            std::string for_clipboard = BuildClipboardString(*mouse_press_highlighted, Without_Error_Bars);
+            QApplication::clipboard()->setText(QString::fromUtf8(for_clipboard.c_str()));
+        }
+    });
+    QAction * copy_with_error_bars_action = new QAction("Copy to clipboard with error bars", this);
+    addAction(copy_with_error_bars_action);
+    QObject::connect(copy_with_error_bars_action, &QAction::triggered, this, [&](bool)
+    {
+        if (mouse_press_highlighted)
+        {
+            std::string for_clipboard = BuildClipboardString(*mouse_press_highlighted, With_Error_Bars);
             QApplication::clipboard()->setText(QString::fromUtf8(for_clipboard.c_str()));
         }
     });
@@ -35,11 +45,12 @@ void BenchmarkGraph::EmitBenchmark(skb::BenchmarkResults * benchmark, int argume
     last_emitted = benchmark;
 }
 
-std::string BenchmarkGraph::BuildClipboardString(const skb::BenchmarkResults & results) const
+std::string BenchmarkGraph::BuildClipboardString(const skb::BenchmarkResults & results, ClipboardStringType type) const
 {
     std::lock_guard<std::mutex> lock(results.results_mutex);
     skb::BenchmarkResults * baseline = results.baseline_results;
     std::string clipboard_string;
+    std::vector<double> all_results;
     for (const auto & run : results.results)
     {
         if (run.first <= 0 || run.second.empty())
@@ -48,7 +59,26 @@ std::string BenchmarkGraph::BuildClipboardString(const skb::BenchmarkResults & r
             continue;
         clipboard_string += std::to_string(run.first);
         clipboard_string += ';';
-        clipboard_string += std::to_string(run.second.front().GetNanosecondsPerItem(baseline));
+        double nanoseconds = run.second.front().GetNanosecondsPerItem(baseline);
+        clipboard_string += std::to_string(nanoseconds);
+        if (type == With_Error_Bars)
+        {
+            all_results.clear();
+            for (const skb::RunResults & result : run.second)
+            {
+                all_results.push_back(result.GetNanosecondsPerItem(baseline));
+            }
+            size_t quarter = all_results.size() / 4;
+            auto percentile_25 = all_results.begin() + quarter;
+            std::nth_element(all_results.begin(), percentile_25, all_results.end());
+            auto percentile_75 = all_results.end() - std::max(size_t(1), quarter);
+            if (percentile_75 != percentile_25)
+                std::nth_element(percentile_25 + 1, percentile_75, all_results.end());
+            clipboard_string += ';';
+            clipboard_string += std::to_string(nanoseconds - *percentile_25);
+            clipboard_string += ';';
+            clipboard_string += std::to_string(*percentile_75 - nanoseconds);
+        }
         clipboard_string += '\n';
     }
     return clipboard_string;
@@ -344,24 +374,57 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
             if (draw_as_points)
             {
                 benchmark_points.clear();
-
-                for (auto & range : benchmark->results)
+                auto begin = benchmark->results.begin();
+                auto end = benchmark->results.end();
+                for (auto it = begin; it != end; ++it)
                 {
-                    if (range.first <= 0)
+                    if (it->first <= 0)
                         continue;
-                    for (const skb::RunResults & result : range.second)
+                    auto next = std::next(it);
+                    double jitter = 0.0;
+                    double jitter_amount = 0.25;
+                    if (it == begin)
+                    {
+                        if (next != end)
+                        {
+                            jitter = next->first / it->first;
+                        }
+                    }
+                    else if (next != end)
+                    {
+                        if (color_choice & 1)
+                        {
+                            auto prev = std::prev(it);
+                            jitter = prev->first / it->first;
+                        }
+                        else
+                        {
+                            jitter = next->first / it->first;
+                        }
+                    }
+                    else
+                    {
+                        auto prev = std::prev(it);
+                        jitter = prev->first / it->first;
+                    }
+                    double jitter_fraction = color_choice / static_cast<double>(std::extent<decltype(colors)>::value);
+                    jitter = std::pow(jitter, jitter_amount * jitter_fraction);
+                    const auto & range = it->second;
+                    for (const skb::RunResults & result : range)
                     {
                         int xvalue = result.argument;
                         double yvalue = yval_from_result(result, baseline);
-                        QPointF point(position_x(xvalue), position_y(yvalue));
+                        QPointF point(position_x(xvalue * jitter), position_y(yvalue));
                         benchmark_points.push_back(point);
                         points.push_back({benchmark, result.argument, point.x(), point.y(), color_choice});
                     }
                 }
                 if (benchmark_points.empty())
                     continue;
-                QPen pen(colors[color_choice]);
-                pen.setWidthF(line_width);
+                QColor color = colors[color_choice];
+                color.setAlpha(127);
+                QPen pen(color);
+                pen.setWidthF(line_width * 4.0f);
                 graph_painter.setPen(pen);
                 color_choice = (color_choice + 1) % std::extent<decltype(colors)>::value;
                 graph_painter.drawPoints(benchmark_points.data(), static_cast<int>(benchmark_points.size()));

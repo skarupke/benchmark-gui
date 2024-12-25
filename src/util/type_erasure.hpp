@@ -12,7 +12,7 @@
 template<size_t Size, size_t Alignment, typename Allocator>
 struct TypeErasureStorage
 {
-    static_assert(Size >= sizeof(typename Allocator::pointer), "need to at least be able to store a pointer to do heap allocations");
+    static_assert(Size >= sizeof(typename std::allocator_traits<Allocator>::pointer), "need to at least be able to store a pointer to do heap allocations");
 private:
     template<typename T>
     using TemplatedAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
@@ -110,7 +110,7 @@ struct MoveVTable : BaseVTable<Size, Alignment, Allocator>
 {
 private:
     template<typename T>
-    using PointerType = typename std::allocator_traits<Allocator>::template rebind_alloc<T>::pointer;
+    using PointerType = typename std::allocator_traits<typename std::allocator_traits<Allocator>::template rebind_alloc<T>>::pointer;
 public:
     typedef TypeErasureStorage<Size, Alignment, Allocator> Storage;
 

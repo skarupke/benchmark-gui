@@ -44,6 +44,7 @@ WARNING_FLAGS += '-Wextra'
 WARNING_FLAGS += '-Wno-unknown-pragmas'
 WARNING_FLAGS += '-Wno-unknown-attributes'
 WARNING_FLAGS += '-Wdeprecated'
+WARNING_FLAGS += '-Wno-deprecated-declarations'
 
 DEFINES += '__STDC_LIMIT_MACROS'
 DEFINES += '__STDC_CONSTANT_MACROS'
@@ -57,12 +58,13 @@ DEFINES += 'QT_NO_KEYWORDS'
 
 --DEFINES += 'RUN_SLOW_TESTS'
 
-CPP_FLAGS += '-std=c++17'
+CPP_FLAGS += '-std=c++20'
 CPP_FLAGS += '-msse3'
 CPP_FLAGS += '-mssse3'
 CPP_FLAGS += '-msse4'
 CPP_FLAGS += '-msse4.1'
 CPP_FLAGS += '-msse4.2'
+--CPP_FLAGS += '-stdlib=libc++'
 
 -- preprocess only
 --CPP_FLAGS += '-E'
@@ -75,11 +77,11 @@ CPP_LINKER = CPP_COMPILER
 local debug_symbols = true
 if debug_symbols then
     CPP_FLAGS += '-g'
-    CPP_FLAGS += '-fdebug-prefix-map=./src/=../src/'
-    CPP_FLAGS += '-fdebug-prefix-map=src/=../src/'
-    CPP_FLAGS += '-fdebug-prefix-map=./libs/=../libs/'
-    CPP_FLAGS += '-fdebug-prefix-map=libs/=../libs/'
-    CPP_FLAGS += '-fdebug-prefix-map=./main=../main'
+    --CPP_FLAGS += '-fdebug-prefix-map=./src/=../src/'
+    --CPP_FLAGS += '-fdebug-prefix-map=src/=../src/'
+    --CPP_FLAGS += '-fdebug-prefix-map=./libs/=../libs/'
+    --CPP_FLAGS += '-fdebug-prefix-map=libs/=../libs/'
+    --CPP_FLAGS += '-fdebug-prefix-map=./main=../main'
 end
 CPP_FLAGS += '-fno-omit-frame-pointer'
 CPP_FLAGS += '-fPIE'
@@ -120,14 +122,14 @@ function compile_cpp(source, inputs)
 		flags = new_flags
 	end
 	tup.definerule{ inputs = inputs,
-					command = CPP_COMPILER .. ' ' .. table.concat(flags, ' ') .. ' -c ' .. source .. ' -o ' .. source .. '.o',
+                    command = CPP_COMPILER .. ' ' .. table.concat(flags, ' ') .. ' -c %f -o %o',
 					outputs = outputs }
 end
 
 function mark_as_cachedir(dir)
 	local output = dir .. 'CACHEDIR.TAG'
 	tup.definerule{ inputs={},
-					command = 'echo "Signature: 8a477f597d28d172789f06886806bc55" > ' .. output,
+                    command = 'echo "Signature: 8a477f597d28d172789f06886806bc55" > %o',
 					outputs = { output } }
 end
 

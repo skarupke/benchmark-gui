@@ -77,6 +77,13 @@ private:
     void mouseMoveEvent(QMouseEvent *event) override;
 
     void EmitBenchmark(skb::BenchmarkResults * benchmark, int argument);
-    std::string BuildClipboardString(const skb::BenchmarkResults & results) const;
+
+    enum ClipboardStringType
+    {
+        Without_Error_Bars,
+        With_Error_Bars
+    };
+
+    std::string BuildClipboardString(const skb::BenchmarkResults & results, ClipboardStringType type) const;
 };
 

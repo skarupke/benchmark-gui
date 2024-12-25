@@ -6,6 +6,7 @@ static_assert(std::is_nothrow_move_assignable<ska::ptr_hash_map<int, int> >::val
 #ifndef DISABLE_TESTS
 #include <gtest/gtest.h>
 #include <random>
+#include <memory>
 
 TEST(sherwood_v4, insert_and_find)
 {

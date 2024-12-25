@@ -2,6 +2,7 @@
 
 #include <iterator>
 #include <algorithm>
+#include <array>
 #include "heap.hpp"
 
 // finds the matching closing bracket. for example

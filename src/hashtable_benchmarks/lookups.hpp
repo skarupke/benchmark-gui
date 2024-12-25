@@ -684,7 +684,7 @@ void RegisterLookup(const interned_string & name, skb::CategoryBuilder categorie
         LookupRange<T>(SKA_BENCHMARK_CATEGORIES(reserve_insert, add_max_load_factor_category(categories.AddCategory("hashtable type", "insert").AddCategory("reserve", "reserve"), max_load_factor).BuildCategories("hashtable", name))->SetBaseline("benchmark_insert_baseline_" + key_str));
         benchmark_erase_whole_table<T> erase;
         erase.max_load_factor = max_load_factor;
-        LookupRange<T>(SKA_BENCHMARK_CATEGORIES(erase, add_max_load_factor_category(categories.AddCategory("hashtable type", "erase"), max_load_factor).BuildCategories("hashtable", name))->SetBaseline("benchmark_erase_whole_table_baseline_" + key_str));
+        LookupReducedRange<T>(SKA_BENCHMARK_CATEGORIES(erase, add_max_load_factor_category(categories.AddCategory("hashtable type", "erase"), max_load_factor).BuildCategories("hashtable", name))->SetBaseline("benchmark_erase_whole_table_baseline_" + key_str));
     }
 }
 
@@ -829,9 +829,14 @@ struct RegisterLookups
 {
     void operator()(const interned_string & name, skb::CategoryBuilder categories_so_far)
     {
+        #ifdef DONE_PULLING_OUT_BINARY
         using int_type = typename ReplaceTemplateArgument<T, KeyPlaceHolder, int>::type;
         RegisterValueCombinations<int_type>()(name, categories_so_far.AddCategory("key", "int"));
         using string_type = typename ReplaceTemplateArgument<T, KeyPlaceHolder, std::string>::type;
         RegisterValueCombinations<string_type>()(name, categories_so_far.AddCategory("key", "string"));
+        #else
+        static_cast<void>(name);
+        static_cast<void>(categories_so_far);
+        #endif
     }
 };

@@ -5,7 +5,7 @@
 
 static constexpr size_t num_runs = 1024;
 
-void task_queue_lib_dispatch(benchmark::State & state)
+/*void task_queue_lib_dispatch(benchmark::State & state)
 {
     std::atomic<size_t> sum{0};
     std::vector<std::future<void>> results;
@@ -75,7 +75,7 @@ void task_queue_lib_dispatch_function_pointer(benchmark::State & state)
     state.counters["shortest"] = shortest;
     state.counters["average"] = average / state.iterations();
 }
-BENCHMARK(task_queue_lib_dispatch_function_pointer);
+BENCHMARK(task_queue_lib_dispatch_function_pointer);*/
 
 void task_queue_sean_parent(benchmark::State & state)
 {

@@ -511,10 +511,10 @@ void benchmark_empty_baseline(skb::State & state)
     {
     }
 }
-SKA_BENCHMARK("baseline", benchmark_empty_baseline);
 
 void RegisterControlledRandom()
 {
+    SKA_BENCHMARK_REGISTER("baseline", benchmark_empty_baseline);
     static constexpr int controlled_random_min = 4;
     static constexpr int controlled_random_max = 1024;
     const double controlled_random_multiplier = std::sqrt(2.0);

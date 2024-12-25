@@ -149,7 +149,6 @@ void bit_iter_random_baseline(skb::State & state)
         skb::DoNotOptimize(no_inline_random_number(distribution, global_randomness));
     }
 }
-SKA_BENCHMARK("baseline", bit_iter_random_baseline);
 
 template<typename T, typename Compare>
 void BenchmarkComparison(skb::State & state, Compare compare)
@@ -215,7 +214,6 @@ void benchmark_double_comparison_baseline(skb::State & state)
         return result;
     });
 }
-SKA_BENCHMARK("baseline", benchmark_double_comparison_baseline);
 
 void benchmark_float_comparison(skb::State & state)
 {
@@ -261,7 +259,6 @@ void benchmark_float_comparison_baseline(skb::State & state)
         return result;
     });
 }
-SKA_BENCHMARK("baseline", benchmark_float_comparison_baseline);
 
 static int bit_iter_range_min = 4;
 static int bit_iter_range_max = std::numeric_limits<int>::max();
@@ -286,6 +283,8 @@ void RegisterBitIterBenchmarks(interned_string name)
 
 void RegisterDoubleComparison()
 {
+    SKA_BENCHMARK_REGISTER("baseline", benchmark_double_comparison_baseline);
+    SKA_BENCHMARK_REGISTER("baseline", benchmark_float_comparison_baseline);
     static constexpr int double_comparison_min = 4;
     static constexpr int double_comparison_max = 1024 * 1024;
     static constexpr double double_comparison_multiplier = 4.0f;
@@ -312,6 +311,7 @@ void RegisterDoubleComparison()
 void RegisterControlledRandom();
 void RegisterBitIterBenchmarks()
 {
+    SKA_BENCHMARK_REGISTER("baseline", bit_iter_random_baseline);
     RegisterBitIterBenchmarks<BitIterPlusOne>("plus_one");
     RegisterBitIterBenchmarks<BitIterStartAtZero>("start_at_zero");
     RegisterBitIterBenchmarks<BitIterNoIntrinsic>("no_intrinsic");

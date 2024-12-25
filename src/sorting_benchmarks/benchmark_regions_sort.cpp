@@ -35,8 +35,8 @@ void RegisterRegionsSort()
 {
     skb::CategoryBuilder categories_so_far;
     sort_benchmark::RegisterSort<BenchmarkWrapper<1>::BenchmarkRegionsSort>("regions sort", categories_so_far.AddCategory("num_sub_sorts", "1"));
-    sort_benchmark::RegisterSort<BenchmarkWrapper<2>::BenchmarkRegionsSort>("regions sort", categories_so_far.AddCategory("num_sub_sorts", "2"));
+    //sort_benchmark::RegisterSort<BenchmarkWrapper<2>::BenchmarkRegionsSort>("regions sort", categories_so_far.AddCategory("num_sub_sorts", "2"));
     sort_benchmark::RegisterSort<BenchmarkWrapper<4>::BenchmarkRegionsSort>("regions sort", categories_so_far.AddCategory("num_sub_sorts", "4"));
-    sort_benchmark::RegisterSort<BenchmarkWrapper<8>::BenchmarkRegionsSort>("regions sort", categories_so_far.AddCategory("num_sub_sorts", "8"));
+    //sort_benchmark::RegisterSort<BenchmarkWrapper<8>::BenchmarkRegionsSort>("regions sort", categories_so_far.AddCategory("num_sub_sorts", "8"));
     sort_benchmark::RegisterSort<BenchmarkWrapper<16>::BenchmarkRegionsSort>("regions sort", categories_so_far.AddCategory("num_sub_sorts", "16"));
 }

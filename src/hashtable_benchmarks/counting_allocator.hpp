@@ -3,6 +3,7 @@
 #include <new>
 #include <cstdint>
 #include <limits>
+#include <utility>
 
 struct counting_allocator_stats
 {

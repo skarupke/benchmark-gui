@@ -164,4 +164,3 @@ void RegisterThirdPartyHashtables()
     RegisterLookups<std::unordered_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, ConstKeyAllocator>>()("unordered_map", std_unordered_map);
     RegisterLookups<boost::unordered_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, Allocator>>()("unordered_map", boost_unordered_map);
 }
-

@@ -8,6 +8,7 @@
 #include <memory>
 #include <debug/assert.hpp>
 #include <iterator>
+#include <algorithm>
 
 template<typename It, typename ValueType, typename Compare>
 void heap_replace_top(It begin, It end, ValueType && value, Compare && compare)

@@ -20,14 +20,14 @@
 #define SKA_NOINLINE(...) __VA_ARGS__ __attribute__((noinline))
 #endif
 
-namespace ska
+namespace ska2
 {
 struct prime_number_hash_policy;
 struct power_of_two_hash_policy;
 struct libdivide_prime_hash_policy;
 struct fibonacci_hash_policy;
 
-namespace detailv3
+namespace detail_direct
 {
 template<typename Result, typename Functor>
 struct functor_storage : Functor
@@ -158,7 +158,7 @@ struct KeyOrValueEquality : functor_storage<bool, key_equal>
     }
 };
 static constexpr int8_t min_lookups = 4;
-template<typename T, typename DistanceType = int8_t>
+template<typename T, typename DistanceType>
 struct sherwood_v3_entry
 {
     constexpr sherwood_v3_entry()
@@ -192,7 +192,7 @@ struct sherwood_v3_entry
     }
     bool is_at_desired_position() const
     {
-        return distance_from_desired <= 0;
+        return distance_from_desired <= 256;
     }
     template<typename... Args>
     void emplace(DistanceType distance, Args &&... args)
@@ -287,15 +287,13 @@ enum FlatHashMapLookupType
 {
     SimpleLookup,
     ExtraZeroCheck,
-    EqualityCheck,
-    Indexing,
-    JumpAfterFirst
+    EqualityCheck
 };
 
 template<typename T, typename FindKey, typename ArgumentHash, typename Hasher, typename ArgumentEqual, typename Equal, typename ArgumentAlloc, typename EntryAlloc, FlatHashMapLookupType lookup_type, typename DistanceType>
 class sherwood_v3_table : private EntryAlloc, private Hasher, private Equal
 {
-    using Entry = detailv3::sherwood_v3_entry<T, DistanceType>;
+    using Entry = detail_direct::sherwood_v3_entry<T, DistanceType>;
     using AllocatorTraits = std::allocator_traits<EntryAlloc>;
     using EntryPointer = typename AllocatorTraits::pointer;
     struct convertible_to_iterator;
@@ -549,80 +547,14 @@ public:
 
     iterator find(const FindKey & key)
     {
-        if constexpr (lookup_type == SimpleLookup)
+        size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
+        EntryPointer it = entries + ptrdiff_t(index);
+        for (DistanceType distance = 0; it->distance_from_desired >= distance; distance += 257, ++it)
         {
-            size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
-            EntryPointer it = entries + ptrdiff_t(index);
-            for (DistanceType distance = 0; it->distance_from_desired >= distance; ++distance, ++it)
-            {
-                if (compares_equal(key, it->value))
-                    return { it };
-            }
-            return end();
+            if (compares_equal(key, it->value))
+                return { it };
         }
-        else if constexpr (lookup_type == Indexing)
-        {
-            size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
-            EntryPointer it = entries + ptrdiff_t(index);
-            for (DistanceType distance = 0; it[distance].distance_from_desired >= distance; ++distance)
-            {
-                if (compares_equal(key, it[distance].value))
-                    return { it + distance };
-            }
-            return end();
-        }
-        else if constexpr (lookup_type == ExtraZeroCheck)
-        {
-            size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
-            EntryPointer it = entries + ptrdiff_t(index);
-            if (it->distance_from_desierd >= 0)
-            {
-                if (it->distance_from_desired == 0 && compares_equal(key, it->value))
-                    return { it };
-                DistanceType distance = 1;
-                for (++it; it->distance_from_desired >= distance; ++distance, ++it)
-                {
-                    if (compares_equal(key, it->value))
-                        return { it };
-                }
-            }
-            return end();
-        }
-        else if constexpr (lookup_type == JumpAfterFirst)
-        {
-            size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
-            EntryPointer it = entries + ptrdiff_t(index);
-            if (it->distance_from_desired >= 0)
-            {
-                DistanceType distance = 0;
-                if (it->distance_from_desired > 0)
-                    distance = it->distance_to_desired;
-                else if (compares_equal(key, it->value))
-                    return { it };
-                for (++distance; it[distance].distance_from_desired >= distance; ++distance)
-                {
-                    if (compares_equal(key, it[distance].value))
-                        return { it + distance };
-                }
-            }
-            return end();
-        }
-        else
-        {
-            size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
-            EntryPointer it = entries + ptrdiff_t(index);
-            for (DistanceType distance = 0;; ++distance, ++it)
-            {
-                if (it->distance_from_desired == distance)
-                {
-                    if (compares_equal(key, it->value))
-                        return { it };
-                }
-                else if (it->distance_from_desired < distance)
-                    break;
-            }
-            return end();
-        }
+        return end();
     }
     const_iterator find(const FindKey & key) const
     {
@@ -653,34 +585,13 @@ public:
     int num_lookups(const FindKey & key)
     {
         int result = 0;
-        if constexpr (lookup_type == SimpleLookup)
+        size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
+        EntryPointer it = entries + ptrdiff_t(index);
+        for (DistanceType distance = 0; it->distance_from_desired >= distance; distance += 257, ++it)
         {
-            size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
-            EntryPointer it = entries + ptrdiff_t(index);
-            for (DistanceType distance = 0; it->distance_from_desired >= distance; ++distance, ++it)
-            {
-                ++result;
-                if (compares_equal(key, it->value))
-                    return result;
-            }
-        }
-        else// if constexpr (lookup_type == ExtraZeroCheck)
-        {
-            size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
-            EntryPointer it = entries + ptrdiff_t(index);
-            if (it->distance_from_desired == 0)
-            {
-                ++result;
-                if (compares_equal(key, it->value))
-                    return result;
-            }
-            DistanceType distance = 1;
-            for (++it; it->distance_from_desired >= distance; ++distance, ++it)
-            {
-                ++result;
-                if (compares_equal(key, it->value))
-                    return result;
-            }
+            ++result;
+            if (compares_equal(key, it->value))
+                return result;
         }
         return result;
     }
@@ -691,7 +602,7 @@ public:
         size_t index = hash_policy.template index_for_hash<0>(hash_object(key), num_slots_minus_one);
         EntryPointer current_entry = entries + ptrdiff_t(index);
         DistanceType distance_from_desired = 0;
-        for (; current_entry->distance_from_desired >= distance_from_desired; ++current_entry, ++distance_from_desired)
+        for (; current_entry->distance_from_desired >= distance_from_desired; ++current_entry, distance_from_desired += 257)
         {
             if (compares_equal(key, current_entry->value))
                 return { { current_entry }, false };
@@ -745,7 +656,7 @@ public:
         auto new_prime_index = hash_policy.next_size_over(num_buckets);
         if (num_buckets == bucket_count())
             return;
-        int8_t new_max_lookups = compute_max_lookups(num_buckets);
+        DistanceType new_max_lookups = compute_max_lookups(num_buckets);
         EntryPointer new_buckets(AllocatorTraits::allocate(*this, num_buckets + new_max_lookups));
         EntryPointer special_end_item = new_buckets + static_cast<ptrdiff_t>(num_buckets + new_max_lookups - 1);
         for (EntryPointer it = new_buckets; it != special_end_item; ++it)
@@ -755,7 +666,7 @@ public:
         std::swap(num_slots_minus_one, num_buckets);
         --num_slots_minus_one;
         hash_policy.commit(new_prime_index);
-        int8_t old_max_lookups = max_lookups;
+        DistanceType old_max_lookups = max_lookups;
         max_lookups = new_max_lookups;
         num_elements = 0;
         for (EntryPointer it = new_buckets, end = it + static_cast<ptrdiff_t>(num_buckets + old_max_lookups); it != end; ++it)
@@ -787,7 +698,7 @@ public:
         --num_elements;
         for (EntryPointer next = current + ptrdiff_t(1); !next->is_at_desired_position(); ++current, ++next)
         {
-            current->emplace(next->distance_from_desired - 1, std::move(next->value));
+            current->emplace(std::max<DistanceType>(256, next->distance_from_desired - 257), std::move(next->value));
             next->destroy_value();
         }
         return { to_erase.current };
@@ -807,15 +718,15 @@ public:
         }
         if (end_it == this->end())
             return this->end();
-        ptrdiff_t num_to_move = std::min(static_cast<ptrdiff_t>(end_it.current->distance_from_desired), end_it.current - begin_it.current);
+        ptrdiff_t num_to_move = std::min(static_cast<ptrdiff_t>(end_it.current->distance_from_desired / 257), end_it.current - begin_it.current);
         EntryPointer to_return = end_it.current - num_to_move;
         for (EntryPointer it = end_it.current; !it->is_at_desired_position();)
         {
             EntryPointer target = it - num_to_move;
-            target->emplace(it->distance_from_desired - num_to_move, std::move(it->value));
+            target->emplace(std::max<DistanceType>(256, it->distance_from_desired - num_to_move * 257), std::move(it->value));
             it->destroy_value();
             ++it;
-            num_to_move = std::min(static_cast<ptrdiff_t>(it->distance_from_desired), num_to_move);
+            num_to_move = std::min(static_cast<ptrdiff_t>(it->distance_from_desired / 257), num_to_move);
         }
         return { to_return };
     }
@@ -905,18 +816,18 @@ private:
     EntryPointer entries = Entry::empty_default_table();
     size_t num_slots_minus_one = 0;
     typename HashPolicySelector<ArgumentHash>::type hash_policy;
-    DistanceType max_lookups = detailv3::min_lookups - 1;
+    DistanceType max_lookups = detail_direct::min_lookups - 1;
     DistanceType hit_max_lookups_limit = 0;
     float _max_load_factor = 0.5f;
     size_t num_elements = 0;
 
     int8_t compute_max_lookups(size_t num_buckets)
     {
-        int desired = detailv3::log2(num_buckets);
+        int desired = detail_direct::log2(num_buckets);
         desired += hit_max_lookups_limit;
         desired *= 2;
         desired = std::min(static_cast<int>(std::numeric_limits<int8_t>::max()), desired);
-        return std::max(detailv3::min_lookups, static_cast<int8_t>(desired));
+        return std::max(detail_direct::min_lookups, static_cast<int8_t>(desired));
     }
 
     size_t num_buckets_for_reserve(size_t num_elements) const
@@ -942,7 +853,7 @@ private:
 
     bool hit_max_lookups(DistanceType distance_from_desired)
     {
-        if (distance_from_desired == max_lookups)
+        if ((distance_from_desired & 255) == max_lookups)
         {
             ++hit_max_lookups_limit;
             return true;
@@ -962,7 +873,7 @@ private:
         }
         else if (current_entry->is_empty())
         {
-            current_entry->emplace(distance_from_desired, std::forward<Key>(key), std::forward<Args>(args)...);
+            current_entry->emplace(std::max<DistanceType>(256, distance_from_desired), std::forward<Key>(key), std::forward<Args>(args)...);
             ++num_elements;
             return { { current_entry }, true };
         }
@@ -970,7 +881,7 @@ private:
         swap(distance_from_desired, current_entry->distance_from_desired);
         swap(to_insert, current_entry->value);
         iterator result = { current_entry };
-        for (++distance_from_desired, ++current_entry;; ++current_entry)
+        for (distance_from_desired += 257, ++current_entry;; ++current_entry)
         {
             if (current_entry->is_empty())
             {
@@ -982,11 +893,11 @@ private:
             {
                 swap(distance_from_desired, current_entry->distance_from_desired);
                 swap(to_insert, current_entry->value);
-                ++distance_from_desired;
+                distance_from_desired += 257;
             }
             else
             {
-                ++distance_from_desired;
+                distance_from_desired += 257;
                 if (hit_max_lookups(distance_from_desired))
                 {
                     swap(to_insert, result.current->value);
@@ -1016,7 +927,7 @@ private:
         entries = Entry::empty_default_table();
         num_slots_minus_one = 0;
         hash_policy.reset();
-        max_lookups = detailv3::min_lookups - 1;
+        max_lookups = detail_direct::min_lookups - 1;
         hit_max_lookups_limit = 0;
     }
 
@@ -1394,8 +1305,8 @@ struct power_of_two_hash_policy
 
     int8_t next_size_over(size_t & size) const
     {
-        size = detailv3::next_power_of_two(size);
-        return detailv3::log2(size);
+        size = detail_direct::next_power_of_two(size);
+        return detail_direct::log2(size);
     }
     void commit(int8_t log2)
     {
@@ -1430,8 +1341,8 @@ struct power_of_two_hash_policy_other_bits
 
     int8_t next_size_over(size_t & size) const
     {
-        size = detailv3::next_power_of_two(size);
-        return detailv3::log2(size);
+        size = detail_direct::next_power_of_two(size);
+        return detail_direct::log2(size);
     }
     void commit(int8_t log2)
     {
@@ -1783,8 +1694,8 @@ struct fibonacci_hash_policy
 
     int8_t next_size_over(size_t & size) const
     {
-        size = std::max(size_t(2), detailv3::next_power_of_two(size));
-        return 64 - detailv3::log2(size);
+        size = std::max(size_t(2), detail_direct::next_power_of_two(size));
+        return 64 - detail_direct::log2(size);
     }
     void commit(int8_t shift)
     {
@@ -1799,32 +1710,32 @@ private:
     int8_t shift = 63;
 };
 
-template<typename K, typename V, typename H = std::hash<K>, typename E = std::equal_to<K>, typename A = std::allocator<std::pair<K, V> >, detailv3::FlatHashMapLookupType lookup_type = detailv3::SimpleLookup, typename DistanceType = int8_t >
-class flat_hash_map
-        : public detailv3::sherwood_v3_table
+template<typename K, typename V, typename H = std::hash<K>, typename E = std::equal_to<K>, typename A = std::allocator<std::pair<K, V> >, detail_direct::FlatHashMapLookupType lookup_type = detail_direct::SimpleLookup, typename DistanceType = int16_t >
+class flat_hash_map2
+        : public detail_direct::sherwood_v3_table
         <
             std::pair<K, V>,
             K,
             H,
-            detailv3::KeyOrValueHasher<K, std::pair<K, V>, H>,
+            detail_direct::KeyOrValueHasher<K, std::pair<K, V>, H>,
             E,
-            detailv3::KeyOrValueEquality<K, std::pair<K, V>, E>,
+            detail_direct::KeyOrValueEquality<K, std::pair<K, V>, E>,
             A,
-            typename std::allocator_traits<A>::template rebind_alloc<detailv3::sherwood_v3_entry<std::pair<K, V>, DistanceType>>,
+            typename std::allocator_traits<A>::template rebind_alloc<detail_direct::sherwood_v3_entry<std::pair<K, V>, DistanceType>>,
             lookup_type,
             DistanceType
         >
 {
-    using Table = detailv3::sherwood_v3_table
+    using Table = detail_direct::sherwood_v3_table
     <
         std::pair<K, V>,
         K,
         H,
-        detailv3::KeyOrValueHasher<K, std::pair<K, V>, H>,
+        detail_direct::KeyOrValueHasher<K, std::pair<K, V>, H>,
         E,
-        detailv3::KeyOrValueEquality<K, std::pair<K, V>, E>,
+        detail_direct::KeyOrValueEquality<K, std::pair<K, V>, E>,
         A,
-        typename std::allocator_traits<A>::template rebind_alloc<detailv3::sherwood_v3_entry<std::pair<K, V>, DistanceType>>,
+        typename std::allocator_traits<A>::template rebind_alloc<detail_direct::sherwood_v3_entry<std::pair<K, V>, DistanceType>>,
         lookup_type,
         DistanceType
     >;
@@ -1834,7 +1745,7 @@ public:
     using mapped_type = V;
 
     using Table::Table;
-    flat_hash_map()
+    flat_hash_map2()
     {
     }
 
@@ -1893,7 +1804,7 @@ public:
         return insert_or_assign(std::move(key), std::forward<M>(m)).first;
     }
 
-    friend bool operator==(const flat_hash_map & lhs, const flat_hash_map & rhs)
+    friend bool operator==(const flat_hash_map2 & lhs, const flat_hash_map2 & rhs)
     {
         if (lhs.size() != rhs.size())
             return false;
@@ -1907,7 +1818,7 @@ public:
         }
         return true;
     }
-    friend bool operator!=(const flat_hash_map & lhs, const flat_hash_map & rhs)
+    friend bool operator!=(const flat_hash_map2 & lhs, const flat_hash_map2 & rhs)
     {
         return !(lhs == rhs);
     }
@@ -1922,32 +1833,32 @@ private:
     };
 };
 
-template<typename T, typename H = std::hash<T>, typename E = std::equal_to<T>, typename A = std::allocator<T>, detailv3::FlatHashMapLookupType lookup_type = detailv3::SimpleLookup, typename DistanceType = int8_t >
-class flat_hash_set
-        : public detailv3::sherwood_v3_table
+template<typename T, typename H = std::hash<T>, typename E = std::equal_to<T>, typename A = std::allocator<T>, detail_direct::FlatHashMapLookupType lookup_type = detail_direct::SimpleLookup, typename DistanceType = int16_t >
+class flat_hash_set2
+        : public detail_direct::sherwood_v3_table
         <
             T,
             T,
             H,
-            detailv3::functor_storage<size_t, H>,
+            detail_direct::functor_storage<size_t, H>,
             E,
-            detailv3::functor_storage<bool, E>,
+            detail_direct::functor_storage<bool, E>,
             A,
-            typename std::allocator_traits<A>::template rebind_alloc<detailv3::sherwood_v3_entry<T, DistanceType>>,
+            typename std::allocator_traits<A>::template rebind_alloc<detail_direct::sherwood_v3_entry<T, DistanceType>>,
             lookup_type,
             DistanceType
         >
 {
-    using Table = detailv3::sherwood_v3_table
+    using Table = detail_direct::sherwood_v3_table
     <
         T,
         T,
         H,
-        detailv3::functor_storage<size_t, H>,
+        detail_direct::functor_storage<size_t, H>,
         E,
-        detailv3::functor_storage<bool, E>,
+        detail_direct::functor_storage<bool, E>,
         A,
-        typename std::allocator_traits<A>::template rebind_alloc<detailv3::sherwood_v3_entry<T, DistanceType>>,
+        typename std::allocator_traits<A>::template rebind_alloc<detail_direct::sherwood_v3_entry<T, DistanceType>>,
         lookup_type,
         DistanceType
     >;
@@ -1956,7 +1867,7 @@ public:
     using key_type = T;
 
     using Table::Table;
-    flat_hash_set()
+    flat_hash_set2()
     {
     }
 
@@ -1982,7 +1893,7 @@ public:
         return Table::emplace(std::move(arg));
     }
 
-    friend bool operator==(const flat_hash_set & lhs, const flat_hash_set & rhs)
+    friend bool operator==(const flat_hash_set2 & lhs, const flat_hash_set2 & rhs)
     {
         if (lhs.size() != rhs.size())
             return false;
@@ -1993,7 +1904,7 @@ public:
         }
         return true;
     }
-    friend bool operator!=(const flat_hash_set & lhs, const flat_hash_set & rhs)
+    friend bool operator!=(const flat_hash_set2 & lhs, const flat_hash_set2 & rhs)
     {
         return !(lhs == rhs);
     }
@@ -2003,17 +1914,17 @@ public:
 template<typename T>
 struct power_of_two_std_hash : std::hash<T>
 {
-    typedef ska::power_of_two_hash_policy hash_policy;
+    typedef ska2::power_of_two_hash_policy hash_policy;
 };
 template<typename T>
 struct libdivide_std_hash : std::hash<T>
 {
-    typedef ska::libdivide_prime_hash_policy hash_policy;
+    typedef ska2::libdivide_prime_hash_policy hash_policy;
 };
 template<typename T>
 struct fibonacci_std_hash : std::hash<T>
 {
-    typedef ska::fibonacci_hash_policy hash_policy;
+    typedef ska2::fibonacci_hash_policy hash_policy;
 };
 
 } // end namespace ska

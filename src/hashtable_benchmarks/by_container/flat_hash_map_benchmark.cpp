@@ -1,6 +1,7 @@
 #include "hashtable_benchmarks/lookups.hpp"
 #include "container/flat_hash_map.hpp"
 #include <x86intrin.h>
+#include "container/flat_hash_map2.hpp"
 
 template<typename K, typename V, typename H, typename E, typename A, auto S>
 struct HasNumLookups<ska::flat_hash_map<K, V, H, E, A, S>>
@@ -53,6 +54,11 @@ void RegisterFlatHashMap()
     RegisterLookups<ska::flat_hash_map<KeyPlaceHolder, ValuePlaceHolder, std_hash, std::equal_to<>, Allocator>>()("flat_hash_map", prime);
     RegisterLookups<ska::flat_hash_map<KeyPlaceHolder, ValuePlaceHolder, power_of_two_hash, std::equal_to<>, Allocator>>()("flat_hash_map", power_of_two);
     RegisterLookups<ska::flat_hash_map<KeyPlaceHolder, ValuePlaceHolder, power_of_two_hash, std::equal_to<>, Allocator, ska::detailv3::EqualityCheck>>()("flat_hash_map", power_of_two.AddCategory("flat_hash_map variation", "equality check"));
+    RegisterLookups<ska::flat_hash_map<KeyPlaceHolder, ValuePlaceHolder, power_of_two_hash, std::equal_to<>, Allocator, ska::detailv3::SimpleLookup, int>>()("flat_hash_map", power_of_two.AddCategory("flat_hash_map variation", "int distance"));
+    RegisterLookups<ska::flat_hash_map<KeyPlaceHolder, ValuePlaceHolder, power_of_two_hash, std::equal_to<>, Allocator, ska::detailv3::Indexing>>()("flat_hash_map", power_of_two.AddCategory("flat_hash_map variation", "indexing"));
+    RegisterLookups<ska::flat_hash_map<KeyPlaceHolder, ValuePlaceHolder, power_of_two_hash, std::equal_to<>, Allocator, ska::detailv3::Indexing, int>>()("flat_hash_map", power_of_two.AddCategory("flat_hash_map variation", "indexing int"));
+    RegisterLookups<ska::flat_hash_map<KeyPlaceHolder, ValuePlaceHolder, power_of_two_hash, std::equal_to<>, Allocator, ska::detailv3::Indexing, std::ptrdiff_t>>()("flat_hash_map", power_of_two.AddCategory("flat_hash_map variation", "indexing ptrdiff_t"));
+    RegisterLookups<ska2::flat_hash_map2<KeyPlaceHolder, ValuePlaceHolder, power_of_two_hash, std::equal_to<>, Allocator, ska2::detail_direct::SimpleLookup, int16_t>>()("flat_hash_map", power_of_two.AddCategory("flat_hash_map variation", "special direct"));
     //RegisterLookups<ska::flat_hash_map<KeyPlaceHolder, ValuePlaceHolder, power_of_two_hash, std::equal_to<>, Allocator, ska::detailv3::ExtraZeroCheck>>()("flat_hash_map", power_of_two.AddCategory("flat_hash_map variation", "zero check"));
     RegisterLookups<ska::flat_hash_map<KeyPlaceHolder, ValuePlaceHolder, ska::fibonacci_std_hash<KeyPlaceHolder>, std::equal_to<>, Allocator>>()("flat_hash_map", fibonacci);
     RegisterLookups<ska::flat_hash_map<KeyPlaceHolder, ValuePlaceHolder, crc32_std_hash<KeyPlaceHolder>, std::equal_to<>, Allocator>>()("flat_hash_map", crc32);
