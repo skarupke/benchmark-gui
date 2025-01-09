@@ -14,10 +14,7 @@
 #include <thread>
 #include "db/sqlite_wrapper.hpp"
 #include "custom_benchmark/main_gui.hpp"
-#include "hashtable_benchmarks/lookups.hpp"
-#include "hashtable_benchmarks/division.hpp"
 #include "math/halton_sequence.hpp"
-#include "util/bit_iter.hpp"
 
 thread_local std::mt19937_64 global_randomness(random_seed_seq::get_instance());
 
@@ -61,21 +58,26 @@ void CreateTables(Database & db)
 {
     RAW_VERIFY(!db.prepare("CREATE TABLE IF NOT EXISTS benchmarks "
                            "(id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                            "categories TEXT UNIQUE)").first.step());
+                           "filename TEXT NOT NULL, "
+                           "categories TEXT UNIQUE)").step());
     RAW_VERIFY(!db.prepare("CREATE TABLE IF NOT EXISTS results "
                            "(benchmark INTEGER, "
                             "num_iterations INTEGER, "
                             "argument INTEGER, "
                             "time INTEGER, "
                             "num_items_processed INTEGER, "
-                            "num_bytes_used INTEGER)").first.step());
+                            "num_bytes_used INTEGER)").step());
     RAW_VERIFY(!db.prepare("CREATE INDEX IF NOT EXISTS results_benchmark_index "
-                           "ON results (benchmark)").first.step());
+                           "ON results (benchmark)").step());
+    RAW_VERIFY(!db.prepare("CREATE INDEX IF NOT EXISTS benchmark_categories_index "
+                           "ON benchmarks (categories)").step());
+    RAW_VERIFY(!db.prepare("CREATE INDEX IF NOT EXISTS benchmark_filename_index "
+                           "ON benchmarks (filename)").step());
 }
 
 int GetBenchmarkId(Database & db, const skb::BenchmarkCategories & categories)
 {
-    SqLiteStatement get_id = db.prepare("SELECT id FROM benchmarks WHERE categories = ?1").first;
+    SqLiteStatement get_id = db.prepare("SELECT id FROM benchmarks WHERE categories = ?1");
     get_id.bind(1, categories.CategoriesString());
     if (!get_id.step())
         return -1;
@@ -84,17 +86,18 @@ int GetBenchmarkId(Database & db, const skb::BenchmarkCategories & categories)
     return result;
 }
 
-int AddBenchmark(Database & db, const skb::BenchmarkCategories & categories)
+int AddBenchmark(Database & db, interned_string executable, const skb::BenchmarkCategories & categories)
 {
-    SqLiteStatement statement = db.prepare("INSERT INTO benchmarks (categories) VALUES (?1)").first;
-    statement.bind(1, categories.CategoriesString());
+    SqLiteStatement statement = db.prepare("INSERT INTO benchmarks (filename, categories) VALUES (?1, ?2)");
+    statement.bind(1, executable.view());
+    statement.bind(2, categories.CategoriesString());
     RAW_VERIFY(!statement.step());
 
     return GetBenchmarkId(db, categories);
 }
 void AddResult(Database & db, int benchmark_id, const skb::RunResults & result)
 {
-    SqLiteStatement statement = db.prepare("INSERT INTO results (benchmark, num_iterations, argument, time, num_items_processed, num_bytes_used) VALUES(?1, ?2, ?3, ?4, ?5, ?6)").first;
+    SqLiteStatement statement = db.prepare("INSERT INTO results (benchmark, num_iterations, argument, time, num_items_processed, num_bytes_used) VALUES(?1, ?2, ?3, ?4, ?5, ?6)");
     statement.bind(1, benchmark_id);
     statement.bind(2, result.num_iterations);
     statement.bind(3, result.argument);
@@ -106,13 +109,17 @@ void AddResult(Database & db, int benchmark_id, const skb::RunResults & result)
 
 static constexpr size_t NumBenchmarksToKeep = 64;
 
-void load_from_db(Database & db)
+void load_from_db(Database & db, interned_string filename)
 {
     CreateTables(db);
-    SqLiteStatement statement = db.prepare("SELECT num_iterations, argument, time, num_items_processed, num_bytes_used FROM results WHERE benchmark = ?1").first;
-    for (auto & benchmark : skb::Benchmark::AllBenchmarks())
+    SqLiteStatement statement = db.prepare("SELECT num_iterations, argument, time, num_items_processed, num_bytes_used FROM results WHERE benchmark = ?1");
+    // Up next: need to re-run this whenever I load results from an executable. Also don't delete results from
+    // DB on save. Or maybe only delete results for the currently loaded file.
+    for (auto & [categories, results] : skb::Benchmark::AllBenchmarks())
     {
-        int benchmark_id = GetBenchmarkId(db, *benchmark.second.categories);
+        if (results.executable != filename)
+            continue;
+        int benchmark_id = GetBenchmarkId(db, categories);
         if (benchmark_id == -1)
             continue;
         statement.bind(1, benchmark_id);
@@ -123,7 +130,7 @@ void load_from_db(Database & db)
             int64_t time = statement.GetInt64(2);
             int64_t num_items_processed = statement.GetInt64(3);
             int64_t num_bytes_used = statement.GetInt64(4);
-            auto & subgroup = benchmark.second.results[argument];
+            auto & subgroup = results.results[argument];
             skb::RunResults result =
             {
                 num_iterations,
@@ -135,7 +142,7 @@ void load_from_db(Database & db)
             subgroup.push_back(std::move(result));
             CHECK_FOR_PROGRAMMER_ERROR(subgroup.size() <= NumBenchmarksToKeep);
         }
-        for (auto & subgroup : benchmark.second.results)
+        for (auto & subgroup : results.results)
         {
             skb::BenchmarkResults::MoveMedianToFront(subgroup.second);
         }
@@ -145,17 +152,33 @@ void load_from_db(Database & db)
 
 void persist_to_db(Database & db)
 {
-    SqLiteStatement begin_transaction = db.prepare("BEGIN").first;
-    SqLiteStatement end_transaction = db.prepare("END").first;
+    ska::flat_hash_set<interned_string> all_filenames;
+    for (const auto &[_, results] : skb::Benchmark::AllBenchmarks()) {
+        all_filenames.insert(results.executable);
+    }
+    SqLiteStatement begin_transaction = db.prepare("BEGIN");
+    SqLiteStatement end_transaction = db.prepare("END");
     RAW_VERIFY(!begin_transaction.step());
-    SqLiteStatement delete_old_results = db.prepare("DELETE FROM results").first;
-    SqLiteStatement delete_old_benchmarks = db.prepare("DELETE FROM benchmarks").first;
-    RAW_VERIFY(!delete_old_results.step());
-    RAW_VERIFY(!delete_old_benchmarks.step());
-    for (auto & benchmark : skb::Benchmark::AllBenchmarks())
+    SqLiteStatement delete_old_results = db.prepare(
+        "DELETE FROM results "
+        "WHERE benchmark IN ( "
+        "   SELECT id "
+        "   FROM benchmarks "
+        "   WHERE filename = ?1 "
+        ")");
+    SqLiteStatement delete_old_benchmarks = db.prepare("DELETE FROM benchmarks WHERE filename = ?1");
+    for (interned_string filename : all_filenames) {
+        delete_old_results.bind(1, filename.view());
+        RAW_VERIFY(!delete_old_results.step());
+        delete_old_results.reset();
+        delete_old_benchmarks.bind(1, filename.view());
+        RAW_VERIFY(!delete_old_benchmarks.step());
+        delete_old_benchmarks.step();
+    }
+    for (auto & [categories, results] : skb::Benchmark::AllBenchmarks())
     {
-        int benchmark_id = AddBenchmark(db, *benchmark.second.categories);
-        for (auto & group : benchmark.second.results)
+        int benchmark_id = AddBenchmark(db, results.executable, categories);
+        for (auto & group : results.results)
         {
             if (group.second.size() > NumBenchmarksToKeep)
             {
@@ -184,9 +207,9 @@ void read_checkbox_state(BenchmarkMainGui & root, Database & db)
     RAW_VERIFY(!db.prepare("CREATE TABLE IF NOT EXISTS checkbox_state "
                            "(category TEXT, "
                             "checkbox TEXT, "
-                            "checked INTEGER)").first.step());
+                            "checked INTEGER)").step());
     std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> state;
-    SqLiteStatement statement = db.prepare("SELECT category, checkbox, checked FROM checkbox_state").first;
+    SqLiteStatement statement = db.prepare("SELECT category, checkbox, checked FROM checkbox_state");
     while (statement.step())
     {
         interned_string category(statement.GetString(0));
@@ -198,8 +221,8 @@ void read_checkbox_state(BenchmarkMainGui & root, Database & db)
 }
 void write_checkbox_state(BenchmarkMainGui & root, Database & db)
 {
-    RAW_VERIFY(!db.prepare("DELETE FROM checkbox_state").first.step());
-    SqLiteStatement statement = db.prepare("INSERT INTO checkbox_state (category, checkbox, checked) VALUES(?1, ?2, ?3)").first;
+    RAW_VERIFY(!db.prepare("DELETE FROM checkbox_state").step());
+    SqLiteStatement statement = db.prepare("INSERT INTO checkbox_state (category, checkbox, checked) VALUES(?1, ?2, ?3)");
     std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> checkbox_state = root.GetCheckboxState();
     for (auto & category : checkbox_state)
     {
@@ -214,24 +237,9 @@ void write_checkbox_state(BenchmarkMainGui & root, Database & db)
     }
 }
 
-extern void count_num_lookups();
-extern void test_iaca(int to_find);
-extern void RegisterSorting();
-extern void RegisterMutex();
-extern void RegisterKnuthBenchmarks();
-extern void RegisterBinarySearchBenchmarks();
-
 #ifndef FUZZER_BUILD
 int main(int argc, char * argv[])
 {
-    RegisterHashtableBenchmarks();
-    RegisterDivision();
-    RegisterBitIterBenchmarks();
-    RegisterSorting();
-    RegisterMutex();
-    RegisterKnuthBenchmarks();
-    RegisterBinarySearchBenchmarks();
-
     if (skb::RunSingleBenchmarkFromCommandLine(argc, argv))
         return 0;
 
@@ -246,9 +254,6 @@ int main(int argc, char * argv[])
         return 0;
 #endif
 
-    test_iaca(5);
-    count_num_lookups();
-
     QApplication app(argc, argv);
 
     const char * filename = "../benchmark_timings.db";
@@ -257,8 +262,6 @@ int main(int argc, char * argv[])
 #endif
 
     Database permanent_storage(filename);
-
-    load_from_db(permanent_storage);
 
     BenchmarkMainGui root;
 
@@ -269,14 +272,14 @@ int main(int argc, char * argv[])
 #endif
 
     std::atomic<bool> keep_running(true);
+    std::mutex results_mutex;
     std::mutex run_first_mutex;
-    std::vector<skb::BenchmarkResults *> run_first;
     std::deque<std::pair<skb::BenchmarkResults *, int>> run_argument_first;
 
-    QObject::connect(&root, &BenchmarkMainGui::RunBenchmarkFirst, &root, [&](const std::vector<skb::BenchmarkResults *> & data)
+    QObject::connect(&root, &BenchmarkMainGui::NewFileLoaded, &root, [&](interned_string filename)
     {
-        std::lock_guard<std::mutex> lock(run_first_mutex);
-        run_first.insert(run_first.end(), data.begin(), data.end());
+        std::lock_guard<std::mutex> lock(results_mutex);
+        load_from_db(permanent_storage, filename);
     });
     QObject::connect(&root.GetGraph(), &BenchmarkGraph::RunBenchmarkFirst, &root, [&](skb::BenchmarkResults * benchmark, int argument)
     {
@@ -286,36 +289,6 @@ int main(int argc, char * argv[])
 
     std::thread benchmark_thread([&]
     {
-        std::deque<std::pair<skb::BenchmarkResults *, int>> to_run;
-
-        {
-            std::map<size_t, std::vector<std::pair<skb::BenchmarkResults *, int>>> batches;
-            for (auto & benchmark : skb::Benchmark::AllBenchmarks())
-            {
-                if (benchmark.first.GetType() == "baseline" || benchmark.first.GetCompiler() != current_compiler)
-                    continue;
-                std::vector<int> arguments = shuffle_in_halton_order(benchmark.second.benchmark->GetAllArguments());
-                size_t batch_size = 16;
-                for (size_t i = 0, end = arguments.size(); i < end;)
-                {
-                    std::vector<std::pair<skb::BenchmarkResults *, int>> & batch = batches[i];
-                    for (size_t batch_end = std::min(i + batch_size, end); i < batch_end; ++i)
-                    {
-                        batch.emplace_back(&benchmark.second, arguments[i]);
-                    }
-                }
-            }
-            for (auto & batch : batches)
-            {
-                to_run.insert(to_run.end(), batch.second.begin(), batch.second.end());
-            }
-        }
-
-        std::stable_sort(to_run.begin(), to_run.end(), [](const std::pair<skb::BenchmarkResults *, int> & a, const std::pair<skb::BenchmarkResults *, int> & b)
-        {
-            return a.first->results[a.second].size() < b.first->results[b.second].size();
-        });
-
         auto can_run = [&](skb::BenchmarkResults * results)
         {
             return results->categories->GetCompiler() == current_compiler;
@@ -347,52 +320,45 @@ int main(int argc, char * argv[])
                         return result;
                     }
                 }
-                if (root.ShouldPreferVisible())
+            }
+            const std::vector<skb::BenchmarkResults *> & visible = root.GetGraph().GetData();
+            skb::BenchmarkResults * min_result = nullptr;
+            int min_argument = 0;
+            size_t min_size = NumBenchmarksToKeep + 12;
+            int xlimit = root.GetGraph().GetXLimit();
+            for (skb::BenchmarkResults * result : visible)
+            {
+                if (!can_run(result))
+                    continue;
+                for (const auto & arg : result->results)
                 {
-                    const std::vector<skb::BenchmarkResults *> & visible = root.GetGraph().GetData();
-                    skb::BenchmarkResults * min_result = nullptr;
-                    int min_argument = 0;
-                    size_t min_size = NumBenchmarksToKeep + 12;
-                    int xlimit = root.GetGraph().GetXLimit();
-                    for (skb::BenchmarkResults * result : visible)
+                    if (xlimit > 0 && arg.first > xlimit)
+                        continue;
+                    if (arg.second.size() < min_size)
                     {
-                        if (!can_run(result))
-                            continue;
-                        for (const auto & arg : result->results)
-                        {
-                            if (xlimit > 0 && arg.first > xlimit)
-                                continue;
-                            if (arg.second.size() < min_size)
-                            {
-                                min_size = arg.second.size();
-                                min_argument = arg.first;
-                                min_result = result;
-                            }
-                        }
+                        min_size = arg.second.size();
+                        min_argument = arg.first;
+                        min_result = result;
                     }
-                    if (min_result)
-                        return std::make_pair(min_result, min_argument);
-                }
-                if (!run_first.empty())
-                {
-                    std::sort(run_first.begin(), run_first.end());
-                    std::stable_partition(to_run.begin(), to_run.end(), [&run_first](const std::pair<skb::BenchmarkResults *, int> & run)
-                    {
-                        return std::binary_search(run_first.begin(), run_first.end(), run.first);
-                    });
-                    run_first.clear();
                 }
             }
-            std::pair<skb::BenchmarkResults *, int> one_argument = to_run.front();
-            to_run.pop_front();
-            to_run.push_back(one_argument);
-            return one_argument;
+            if (min_result)
+                return std::make_pair(min_result, min_argument);
+            else
+                return std::pair<skb::BenchmarkResults *, int>(nullptr, 0);
         };
 
         while (keep_running)
         {
+            std::unique_lock<std::mutex> lock(results_mutex);
             std::pair<skb::BenchmarkResults *, int> next = get_next_to_run();
-            RunOne(*next.first, next.second, root.ProfileMode());
+            if (next.first) {
+                RunOne(*next.first, next.second, root.ProfileMode());
+            }
+            else {
+                lock.unlock();
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
         }
     });
 
@@ -407,7 +373,7 @@ int main(int argc, char * argv[])
 
     persist_to_db(permanent_storage);
     write_checkbox_state(root, permanent_storage);
-    RAW_VERIFY(!permanent_storage.prepare("VACUUM").first.step());
+    RAW_VERIFY(!permanent_storage.prepare("VACUUM").step());
 
     return 0;
 }

@@ -30,7 +30,14 @@ SqLite::SqLite(const char * filename)
         db.reset(open_db);
 }
 
-std::pair<SqLiteStatement, StringView<const char>> SqLite::prepare(StringView<const char> text)
+SqLiteStatement SqLite::prepare(StringView<const char> text)
+{
+    std::pair<SqLiteStatement, StringView<const char>> statement = prepare_part(text);
+    CHECK_FOR_PROGRAMMER_ERROR(statement.second.empty());
+    return std::move(statement.first);
+}
+
+std::pair<SqLiteStatement, StringView<const char>> SqLite::prepare_part(StringView<const char> text)
 {
     sqlite3_stmt * statement = nullptr;
     const char * remainder = nullptr;
@@ -127,7 +134,7 @@ const char * SqLiteStatement::GetString(int index)
 
 static void init_version_table(SqLite & db)
 {
-    sqlite3_step(db.prepare("create table if not exists versions (type STRING PRIMARY KEY NOT NULL, current INTEGER NOT NULL);").first);
+    sqlite3_step(db.prepare("create table if not exists versions (type STRING PRIMARY KEY NOT NULL, current INTEGER NOT NULL);"));
 }
 
 Database::Database(const char *filename)

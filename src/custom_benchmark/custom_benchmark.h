@@ -194,7 +194,7 @@ struct BenchmarkResults
     RunAndBaselineResults Run(int argument, RunType run_type);
     RunAndBaselineResults Run(int argument, float run_time = default_run_time);
     RunAndBaselineResults RunAndAddResults(int argument, float run_time = default_run_time);
-    RunResults RunInNewProcess(int num_iterations, int argument);
+    RunResults RunInNewProcess(int num_iterations, int argument) const;
 
     sig2::Signal<BenchmarkResults *> results_added_signal;
 
@@ -255,8 +255,6 @@ struct Benchmark
     Benchmark(BenchmarkCategories type);
     Benchmark(BenchmarkCategories type, interned_string executable, int index_in_executable);
     virtual ~Benchmark();
-
-    int FindGoodNumberOfIterations(int argument, float desired_running_time) const;
 
     static std::map<BenchmarkCategories, BenchmarkResults> & AllBenchmarks();
     static ska::flat_hash_map<interned_string, ska::flat_hash_map<interned_string, ska::flat_hash_set<BenchmarkResults *>>> & AllCategories();

@@ -42,6 +42,11 @@ const interned_string & BenchmarkCategories::CompilerIndex()
     static const interned_string result = "compiler";
     return result;
 }
+const interned_string & FilenameIndex()
+{
+    static const interned_string result = "filename";
+    return result;
+}
 BenchmarkCategories::BenchmarkCategories() = default;
 BenchmarkCategories::BenchmarkCategories(interned_string type, interned_string name)
 {
@@ -328,27 +333,22 @@ int BenchmarkResults::FindGoodNumberOfIterations(int argument, float desired_run
 {
     auto found = results.find(argument);
     if (found == results.end() || found->second.empty())
-        return benchmark->FindGoodNumberOfIterations(argument, desired_running_time);
+    {
+        RunResults one_iteration = RunInNewProcess(1, argument);
+        double in_seconds = one_iteration.time.count() / 1000000000.0;
+        double estimated_num_iterations = desired_running_time / in_seconds;
+        if (estimated_num_iterations < 2.0)
+            return 1.0;
+        int rerun_iterations = static_cast<int>(std::min(10000.0, estimated_num_iterations));
+        RunResults first_estimate = RunInNewProcess(rerun_iterations, argument);
+        double estimate_result = first_estimate.time.count() / 1000000000.0;
+        double num_iterations = rerun_iterations * (desired_running_time / estimate_result);
+        num_iterations = std::min(num_iterations, static_cast<double>(std::numeric_limits<int>::max()));
+        return static_cast<int>(num_iterations);
+    }
     auto closest = found->second.begin();
     double closest_time = closest->time.count() / 1000000000.0;
     double num_iterations = closest->num_iterations * (desired_running_time / closest_time);
-    num_iterations = std::min(num_iterations, static_cast<double>(std::numeric_limits<int>::max()));
-    return static_cast<int>(num_iterations);
-}
-
-int Benchmark::FindGoodNumberOfIterations(int argument, float desired_running_time) const
-{
-    State one_iteration(1, argument);
-    Run(one_iteration);
-    double in_seconds = one_iteration.GetTotalTime().count() / 1000000000.0;
-    double estimated_num_iterations = desired_running_time / in_seconds;
-    if (estimated_num_iterations < 2.0)
-        return 1.0;
-    int rerun_iterations = static_cast<int>(std::min(10000.0, estimated_num_iterations));
-    State first_estimate(rerun_iterations, one_iteration.GetArgument());
-    Run(first_estimate);
-    double estimate_result = first_estimate.GetTotalTime().count() / 1000000000.0;
-    double num_iterations = rerun_iterations * (desired_running_time / estimate_result);
     num_iterations = std::min(num_iterations, static_cast<double>(std::numeric_limits<int>::max()));
     return static_cast<int>(num_iterations);
 }
@@ -647,7 +647,7 @@ ChildProcessOutput RunProcess(const std::vector<std::string> & arguments, bool f
     return { child_return_code, result };
 }
 
-RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int argument)
+RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int argument) const
 {
     std::vector<std::string> arguments;
     if (this->executable.view().empty())
@@ -687,7 +687,7 @@ double RunResults::GetNanosecondsPerItem(BenchmarkResults * baseline_data) const
         auto found = baseline_data->results.find(argument);
         if (found == baseline_data->results.end())
         {
-            State state(baseline_data->benchmark->FindGoodNumberOfIterations(argument, BenchmarkResults::default_run_time), argument);
+            State state(baseline_data->FindGoodNumberOfIterations(argument, BenchmarkResults::default_run_time), argument);
             baseline_data->benchmark->Run(state);
             RunResults new_results = state.GetResults();
             double diff = GetNanosecondsPerItem(nullptr) - new_results.GetNanosecondsPerItem(nullptr);
@@ -769,6 +769,11 @@ std::vector<std::string> SplitString(const std::string & str, char to_split)
 std::vector<std::unique_ptr<BenchmarkInOtherProcess>> benchmarks_in_other_files;
 void LoadAllBenchmarks(interned_string executable, const std::string & run_results)
 {
+    interned_string filename = executable;
+    auto filename_end = std::find(executable.view().rbegin(), executable.view().rend(), '/');
+    if (filename_end != executable.view().rend()) {
+        filename = interned_string(filename.view().substr(filename_end.base() - executable.view().begin()));
+    }
     std::vector<std::string> lines = SplitString(run_results, '\n');
     CHECK_FOR_INVALID_DATA(lines[0] == "V1");
     std::vector<std::pair<size_t, interned_string>> baseline_to_fill_in;
@@ -779,6 +784,7 @@ void LoadAllBenchmarks(interned_string executable, const std::string & run_resul
         CHECK_FOR_INVALID_DATA(lines.size() > line + 2);
         Benchmark::RangeOfArguments range = Benchmark::RangeOfArguments::Deserialize(lines[line + 1]);
         BenchmarkCategories categories = BenchmarkCategories::Deserialize(lines[line + 2]);
+        categories.AddCategory(FilenameIndex(), filename);
         if (lines[line] == "BenchmarkWithBaseline") {
             CHECK_FOR_INVALID_DATA(lines.size() > line + 3);
             baseline_to_fill_in.emplace_back(benchmarks_in_other_files.size(), lines[line + 3]);

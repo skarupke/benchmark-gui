@@ -86,6 +86,9 @@
         "list": "cpp",
         "qmessagebox": "cpp",
         "qgridlayout": "cpp",
-        "qcheckbox": "cpp"
+        "qcheckbox": "cpp",
+        "qpushbutton": "cpp",
+        "qscrollarea": "cpp",
+        "qcombobox": "cpp"
     }
 }

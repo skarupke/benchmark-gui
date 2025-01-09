@@ -69,7 +69,8 @@ struct SqLite
         return bool(db);
     }
 
-    std::pair<SqLiteStatement, StringView<const char>> prepare(StringView<const char> text);
+    SqLiteStatement prepare(StringView<const char> text);
+    std::pair<SqLiteStatement, StringView<const char>> prepare_part(StringView<const char> text);
 
 private:
     std::unique_ptr<sqlite3, SqLiteDestructor> db;

@@ -15,16 +15,12 @@ class BenchmarkMainGui : public QWidget
 public:
     BenchmarkMainGui();
 
-    GUI_CS_SIGNAL_1(Public, void RunBenchmarkFirst(const std::vector<skb::BenchmarkResults *> & to_run))
-    GUI_CS_SIGNAL_2(RunBenchmarkFirst, to_run)
+    GUI_CS_SIGNAL_1(Public, void NewFileLoaded(interned_string filename))
+    GUI_CS_SIGNAL_2(NewFileLoaded, filename)
 
     BenchmarkGraph & GetGraph()
     {
         return graph;
-    }
-    bool ShouldPreferVisible() const
-    {
-        return prefer_visible_checkbox.isChecked();
     }
     bool ProfileMode() const
     {
@@ -37,15 +33,15 @@ public:
 private:
     QScrollArea benchmark_checkbox_area;
     QScrollArea category_checkbox_area;
+    QGridLayout * rhs_layout; // owned by [layout]
     QGridLayout layout;
+    int rhs_checkbox_row = 0;
     std::unique_ptr<QWidget> checkboxes_widget;
 
     QPushButton add_benchmarks;
-    QPushButton run_current;
     QPushButton reset_current;
     QCheckBox normalize_checkbox;
     QCheckBox draw_points_checkbox;
-    QCheckBox prefer_visible_checkbox;
     QCheckBox profile_mode;
     QLineEdit xlimit;
 

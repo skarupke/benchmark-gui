@@ -395,7 +395,7 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
                         if (color_choice & 1)
                         {
                             auto prev = std::prev(it);
-                            jitter = prev->first / it->first;
+                            jitter = it->first / prev->first;
                         }
                         else
                         {
@@ -405,7 +405,7 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
                     else
                     {
                         auto prev = std::prev(it);
-                        jitter = prev->first / it->first;
+                        jitter = it->first / prev->first;
                     }
                     double jitter_fraction = color_choice / static_cast<double>(std::extent<decltype(colors)>::value);
                     jitter = std::pow(jitter, jitter_amount * jitter_fraction);
@@ -426,7 +426,6 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
                 QPen pen(color);
                 pen.setWidthF(line_width * 4.0f);
                 graph_painter.setPen(pen);
-                color_choice = (color_choice + 1) % std::extent<decltype(colors)>::value;
                 graph_painter.drawPoints(benchmark_points.data(), static_cast<int>(benchmark_points.size()));
             }
             else
@@ -457,9 +456,9 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
                 QPen pen(colors[color_choice]);
                 pen.setWidthF(line_width);
                 graph_painter.setPen(pen);
-                color_choice = (color_choice + 1) % std::extent<decltype(colors)>::value;
                 graph_painter.drawPath(path);
             }
+            color_choice = (color_choice + 1) % std::extent<decltype(colors)>::value;
         }
     }
 
