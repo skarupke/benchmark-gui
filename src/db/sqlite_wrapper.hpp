@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include "util/view.hpp"
 #include <string_view>
 
 struct sqlite3;
@@ -38,7 +37,6 @@ struct SqLiteStatement
     void bind(int index, int value);
     void bind(int index, int64_t value);
     void bind(int index, double value);
-    //void bind(int index, StringView<const char> text);
     void bind(int index, std::string_view text);
 
     int GetInt(int index);
@@ -69,9 +67,9 @@ struct SqLite
         return bool(db);
     }
 
-    SqLiteStatement prepare(StringView<const char> text);
-    void prepare_and_run(StringView<const char> text);
-    std::pair<SqLiteStatement, StringView<const char>> prepare_part(StringView<const char> text);
+    SqLiteStatement prepare(std::string_view text);
+    void prepare_and_run(std::string_view text);
+    std::pair<SqLiteStatement, std::string_view> prepare_part(std::string_view text);
 
 private:
     std::unique_ptr<sqlite3, SqLiteDestructor> db;

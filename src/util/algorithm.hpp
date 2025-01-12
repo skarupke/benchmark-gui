@@ -159,6 +159,9 @@ size_t find_index(It begin, It end, const V & value)
     return static_cast<size_t>(-1);
 }
 
+// Creates pointers to the top N elements in [in_begin, in_end], in sorted order.
+// The pointers are stored in [out_begin, out_end]
+// and N = out_end - out_begin
 template<typename It, typename OutIt, typename Compare>
 OutIt partial_sort_pointer(It in_begin, It in_end, OutIt out_begin, OutIt out_end, Compare && compare)
 {

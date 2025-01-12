@@ -96,6 +96,7 @@
         "queue": "cpp",
         "stack": "cpp",
         "forward_list": "cpp",
-        "format": "cpp"
+        "format": "cpp",
+        "qapplication": "cpp"
     }
 }

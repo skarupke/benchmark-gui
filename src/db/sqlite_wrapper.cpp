@@ -30,14 +30,14 @@ SqLite::SqLite(const char * filename)
         db.reset(open_db);
 }
 
-SqLiteStatement SqLite::prepare(StringView<const char> text)
+SqLiteStatement SqLite::prepare(std::string_view text)
 {
-    std::pair<SqLiteStatement, StringView<const char>> statement = prepare_part(text);
+    std::pair<SqLiteStatement, std::string_view> statement = prepare_part(text);
     CHECK_FOR_PROGRAMMER_ERROR(statement.second.empty());
     return std::move(statement.first);
 }
 
-std::pair<SqLiteStatement, StringView<const char>> SqLite::prepare_part(StringView<const char> text)
+std::pair<SqLiteStatement, std::string_view> SqLite::prepare_part(std::string_view text)
 {
     sqlite3_stmt * statement = nullptr;
     const char * remainder = nullptr;
@@ -47,10 +47,10 @@ std::pair<SqLiteStatement, StringView<const char>> SqLite::prepare_part(StringVi
         UNHANDLED_ERROR("couldn't prepare a statement. should pass the error up the callstack");
         return {SqLiteStatement(), text};
     }
-    return {SqLiteStatement(statement), StringView<const char>{remainder, text.end()}};
+    return {SqLiteStatement(statement), text.substr(remainder - text.data())};
 }
 
-void SqLite::prepare_and_run(StringView<const char> text) {
+void SqLite::prepare_and_run(std::string_view text) {
     RAW_VERIFY(!prepare(text).step());
 }
 
@@ -102,14 +102,6 @@ void SqLiteStatement::bind(int index, double value)
     }
 }
 
-/*void SqLiteStatement::bind(int index, StringView<const char> text)
-{
-    int result = sqlite3_bind_text(statement.get(), index, text.data(), text.size(), SQLITE_TRANSIENT);
-    if (result != SQLITE_OK)
-    {
-        UNHANDLED_ERROR("TODO: handle error of sqlite_bind");
-    }
-}*/
 void SqLiteStatement::bind(int index, std::string_view text)
 {
     int result = sqlite3_bind_text(statement.get(), index, text.data(), text.size(), SQLITE_TRANSIENT);

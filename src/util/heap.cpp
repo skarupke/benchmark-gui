@@ -1382,25 +1382,3 @@ TEST(heap_heap_sort, DISABLED_increasing_length)
 
 #endif
 
-struct int_in_range
-{
-    uint64_t limit;
-    // from https://lemire.me/blog/2019/06/06/nearly-divisionless-random-integer-generation-on-various-systems/
-    template<typename Randomness>
-    size_t operator()(Randomness & random) const
-    {
-          uint64_t x = random() ;
-          __uint128_t m = ( __uint128_t ) x * ( __uint128_t ) limit;
-          uint64_t l = ( uint64_t ) m;
-          if (l < limit) {
-            uint64_t t = -limit % limit;
-            while (l < t) {
-              x = random() ;
-              m = ( __uint128_t ) x * ( __uint128_t ) limit;
-              l = ( uint64_t ) m;
-            }
-          }
-          return m >> 64;
-    }
-};
-
