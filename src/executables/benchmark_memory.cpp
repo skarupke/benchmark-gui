@@ -3,8 +3,8 @@
 #include <vector>
 
 #include "custom_benchmark/custom_benchmark.h"
+#include "custom_benchmark/utils.hpp"
 #include "test/include_test.hpp"
-#include "hashtable_benchmarks/benchmark_shared.hpp"
 
 
 static constexpr const size_t num_loops = 10000;

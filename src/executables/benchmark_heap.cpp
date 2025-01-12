@@ -1,6 +1,6 @@
 #include "util/heap.hpp"
 #include "custom_benchmark/custom_benchmark.h"
-#include "hashtable_benchmarks/benchmark_shared.hpp"
+#include "custom_benchmark/utils.hpp"
 #include <algorithm>
 #include <set>
 #include "test/include_test.hpp"
