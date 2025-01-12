@@ -12,7 +12,6 @@
 #include <iterator>
 #include <utility>
 #include <type_traits>
-#include "math/libdivide.h"
 
 #ifdef _MSC_VER
 #define SKA_NOINLINE(...) __declspec(noinline) __VA_ARGS__
@@ -24,7 +23,6 @@ namespace ska
 {
 struct prime_number_hash_policy;
 struct power_of_two_hash_policy;
-struct libdivide_prime_hash_policy;
 struct fibonacci_hash_policy;
 
 namespace detailv3
@@ -275,7 +273,6 @@ template<typename T, typename = void>
 struct HashPolicySelector
 {
     typedef prime_number_hash_policy type;
-    //typedef libdivide_prime_hash_policy type;
 };
 template<typename T>
 struct HashPolicySelector<T, void_t<typename T::hash_policy>>
@@ -1452,45 +1449,6 @@ private:
     int8_t log2_of_size = 0;
 };
 
-struct libdivide_prime_hash_policy
-{
-    template<int num_extra_bits>
-    size_t index_for_hash(size_t hash, size_t num_slots_minus_one) const
-    {
-        size_t div = libdivide::libdivide_u64_branchfree_do(hash, &state);
-        return hash - div * (num_slots_minus_one + 1);
-    }
-    size_t keep_in_range(size_t hash, size_t num_slots_minus_one) const
-    {
-        if (hash <= num_slots_minus_one)
-            return hash;
-        size_t div = libdivide::libdivide_u64_branchfree_do(hash, &state);
-        return hash - div * (num_slots_minus_one + 1);
-    }
-    libdivide::libdivide_u64_branchfree_t next_size_over(size_t & size) const
-    {
-        prime_number_hash_policy().next_size_over(size);
-        return libdivide::libdivide_u64_branchfree_gen(size);
-    }
-    void commit(libdivide::libdivide_u64_branchfree_t state)
-    {
-        this->state = state;
-    }
-    void reset()
-    {
-        state = { 0xffffffffffffffff, 0 };
-    }
-
-    template<int num_extra_bits>
-    uint8_t extra_bits_for_hash(size_t hash) const
-    {
-        return static_cast<uint8_t>(hash) & (0b11111111 >> (8 - num_extra_bits));
-    }
-
-private:
-    libdivide::libdivide_u64_branchfree_t state = { 0xffffffffffffffff, 0 };
-};
-
 struct switch_prime_number_hash_policy
 {
     template<int /*num_extra_bits*/>
@@ -2004,11 +1962,6 @@ template<typename T>
 struct power_of_two_std_hash : std::hash<T>
 {
     typedef ska::power_of_two_hash_policy hash_policy;
-};
-template<typename T>
-struct libdivide_std_hash : std::hash<T>
-{
-    typedef ska::libdivide_prime_hash_policy hash_policy;
 };
 template<typename T>
 struct fibonacci_std_hash : std::hash<T>

@@ -5,8 +5,6 @@
 #include <string>
 #include <memory>
 #include <map>
-#include <set>
-#include "container/small_vector.hpp"
 #include <mutex>
 #include <signals/connection.hpp>
 #include "benchmark/benchmark.h"

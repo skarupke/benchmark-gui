@@ -1,6 +1,5 @@
 #pragma once
 
-#include <memory>
 #include <string>
 #include <string_view>
 #include <iosfwd>
@@ -98,8 +97,6 @@ struct interned_string
     {
         return l << r.str;
     }
-
-    //static size_t garbage_collect();
 
     struct pointer_less
     {
