@@ -192,8 +192,6 @@ struct BenchmarkResults
     };
 
     RunAndBaselineResults Run(int argument, RunType run_type);
-    RunAndBaselineResults Run(int argument, float run_time = default_run_time);
-    RunAndBaselineResults RunAndAddResults(int argument, float run_time = default_run_time);
     RunResults RunInNewProcess(int num_iterations, int argument) const;
 
     sig2::Signal<BenchmarkResults *> results_added_signal;
@@ -253,7 +251,6 @@ struct CategoryBuilder
 
 struct Benchmark
 {
-    virtual void Run(State & state) const = 0;
     Benchmark(BenchmarkCategories type);
     Benchmark(BenchmarkCategories type, interned_string executable, int index_in_executable);
     virtual ~Benchmark();
@@ -296,25 +293,24 @@ private:
     double range_multiplier = 0;
 
 protected:
-    std::vector<skb::BenchmarkResults *> results;
+    skb::BenchmarkResults * results = nullptr;
 
 private:
     mutable std::mutex arguments_mutex;
     mutable std::vector<int> all_arguments;
 
-    skb::BenchmarkResults * AddToAllBenchmarks(const BenchmarkCategories & categories);
+    void AddToAllBenchmarks(const BenchmarkCategories & categories);
 };
 struct LambdaBenchmark : Benchmark
 {
     LambdaBenchmark(std::function<void (State &)> func, BenchmarkCategories categories);
-    void Run(State & state) const override;
+    void Run(State & state) const;
 
     std::function<void (State & state)> function;
 };
 struct BenchmarkInOtherProcess : Benchmark
 {
     BenchmarkInOtherProcess(BenchmarkCategories type, Benchmark::RangeOfArguments range, interned_string executable, int index_in_executable);
-    void Run(State & state) const override;
 };
 
 bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[]);

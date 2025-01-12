@@ -26,7 +26,6 @@ void RunOne(skb::BenchmarkResults & benchmark_data, int argument, bool profile_m
     std::cout << message;
     std::cout.flush();
     skb::BenchmarkResults::RunAndBaselineResults result = benchmark_data.Run(argument, profile_mode ? skb::BenchmarkResults::ProfileMode : skb::BenchmarkResults::Normal);
-    //skb::BenchmarkResults::RunAndBaselineResults result = profile_mode ? benchmark_data.Run(argument, 10.0f) : benchmark_data.RunAndAddResults(argument);
 
     double nanoseconds = result.results.time.count() / static_cast<double>(result.results.num_iterations);
     message = std::to_string(static_cast<int64_t>(nanoseconds));

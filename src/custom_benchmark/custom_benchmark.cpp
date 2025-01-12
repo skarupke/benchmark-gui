@@ -188,9 +188,9 @@ std::map<interned_string, std::vector<BenchmarkResults *>, interned_string::poin
     return result;
 }
 
-static std::vector<BenchmarkResults *> & AllBenchmarksNumbered()
+static std::vector<std::pair<BenchmarkResults *, LambdaBenchmark *>> & AllBenchmarksNumbered()
 {
-    static std::vector<BenchmarkResults *> result;
+    static std::vector<std::pair<BenchmarkResults *, LambdaBenchmark *>> result;
     return result;
 }
 
@@ -199,57 +199,51 @@ Benchmark::Benchmark(BenchmarkCategories categories)
     BenchmarkCategories compiler_categories = categories;
     compiler_categories.AddCategory(BenchmarkCategories::CompilerIndex(), CurrentCompiler());
     compiler_categories.AddCategory(BenchmarkCategories::OptimizerIndex(), DebugOrRelease());
-    skb::BenchmarkResults * new_results = AddToAllBenchmarks(compiler_categories);
-    new_results->my_global_index = AllBenchmarksNumbered().size();
-    AllBenchmarksNumbered().push_back(new_results);
+    AddToAllBenchmarks(compiler_categories);
+    results->my_global_index = AllBenchmarksNumbered().size();
 }
 Benchmark::Benchmark(BenchmarkCategories type, interned_string executable, int index_in_executable)
 {
-    skb::BenchmarkResults * new_results = AddToAllBenchmarks(type);
-    new_results->executable = executable;
-    new_results->my_global_index = index_in_executable;
+    AddToAllBenchmarks(type);
+    results->executable = executable;
+    results->my_global_index = index_in_executable;
 }
 
-skb::BenchmarkResults * Benchmark::AddToAllBenchmarks(const BenchmarkCategories & categories)
+void Benchmark::AddToAllBenchmarks(const BenchmarkCategories & categories)
 {
     auto [added, did_add] = AllBenchmarks().emplace(categories, this);
     CHECK_FOR_PROGRAMMER_ERROR(did_add);
-    skb::BenchmarkResults * new_results = &added->second;
-    new_results->categories = &added->first;
+    results = &added->second;
+    results->categories = &added->first;
     for (const auto & category : categories.GetCategories())
     {
-        RAW_VERIFY(AllCategories()[category.first][category.second].insert(new_results).second);
+        RAW_VERIFY(AllCategories()[category.first][category.second].insert(results).second);
     }
     if (categories.GetType() == "baseline")
     {
-        AllBaselineBenchmarks()[categories.GetName()].push_back(new_results);
+        AllBaselineBenchmarks()[categories.GetName()].push_back(results);
     }
-    results.push_back(new_results);
-    return new_results;
 }
 
 Benchmark * Benchmark::SetBaseline(interned_string name_of_baseline_benchmark)
 {
-    for (skb::BenchmarkResults * result : results)
+    auto & baselines = AllBaselineBenchmarks();
+    auto found = baselines.find(name_of_baseline_benchmark);
+    CHECK_FOR_PROGRAMMER_ERROR(found != baselines.end());
+
+    bool found_it = false;
+    for (BenchmarkResults * baseline : found->second)
     {
-        auto & baselines = AllBaselineBenchmarks();
-        auto found = baselines.find(name_of_baseline_benchmark);
-        CHECK_FOR_PROGRAMMER_ERROR(found != baselines.end());
+        if (baseline->categories->GetCompiler() != results->categories->GetCompiler())
+            continue;
+        if (baseline->categories->GetOptimizer() != results->categories->GetOptimizer())
+            continue;
 
-        bool found_it = false;
-        for (BenchmarkResults * baseline : found->second)
-        {
-            if (baseline->categories->GetCompiler() != result->categories->GetCompiler())
-                continue;
-            if (baseline->categories->GetOptimizer() != result->categories->GetOptimizer())
-                continue;
-
-            result->baseline_results = baseline;
-            found_it = true;
-            break;
-        }
-        CHECK_FOR_PROGRAMMER_ERROR(found_it);
+        results->baseline_results = baseline;
+        found_it = true;
+        break;
     }
+    CHECK_FOR_PROGRAMMER_ERROR(found_it);
     return this;
 }
 
@@ -491,66 +485,6 @@ void BenchmarkResults::ClearResults()
     results_added_signal.emit(this);
 }
 
-BenchmarkResults::RunAndBaselineResults BenchmarkResults::Run(int argument, float run_time)
-{
-    int good_number = FindGoodNumberOfIterations(argument, run_time);
-    skb::State benchmark_state(good_number, argument);
-    benchmark->Run(benchmark_state);
-
-    RunAndBaselineResults result = { benchmark_state.GetResults(), nullptr };
-    std::unique_ptr<skb::State> baseline_state;
-    if (baseline_results)
-    {
-        int baseline_good_number = baseline_results->FindGoodNumberOfIterations(argument, default_run_time);
-        baseline_state.reset(new skb::State(baseline_good_number, argument));
-        baseline_results->benchmark->Run(*baseline_state);
-        result.baseline_results.reset(new RunResults(baseline_state->GetResults()));
-    }
-    return result;
-}
-
-BenchmarkResults::RunAndBaselineResults BenchmarkResults::RunAndAddResults(int argument, float run_time)
-{
-#if RUN_BASELINE_SECOND
-    int good_number = FindGoodNumberOfIterations(argument, run_time);
-    skb::State benchmark_state(good_number, argument);
-    benchmark->Run(benchmark_state);
-
-    RunAndBaselineResults result = { benchmark_state.GetResults(), nullptr };
-    std::unique_ptr<skb::State> baseline_state;
-    if (baseline_results)
-    {
-        int baseline_good_number = baseline_results->FindGoodNumberOfIterations(argument, default_run_time);
-        baseline_state.reset(new skb::State(baseline_good_number, argument));
-        baseline_results->benchmark->Run(*baseline_state);
-        result.baseline_results.reset(new RunResults(baseline_state->GetResults()));
-        baseline_results->AddResult(*result.baseline_results);
-    }
-    AddResult(result.results);
-    return result;
-#else
-    std::unique_ptr<skb::State> baseline_state;
-    if (baseline_results)
-    {
-        int baseline_good_number = baseline_results->FindGoodNumberOfIterations(argument, default_run_time);
-        baseline_state.reset(new skb::State(baseline_good_number, argument));
-        baseline_results->benchmark->Run(*baseline_state);
-    }
-    int good_number = FindGoodNumberOfIterations(argument, run_time);
-    skb::State benchmark_state(good_number, argument);
-    benchmark->Run(benchmark_state);
-
-    RunAndBaselineResults result = { benchmark_state.GetResults(), nullptr };
-    if (baseline_state)
-    {
-        result.baseline_results.reset(new RunResults(baseline_state->GetResults()));
-        baseline_results->AddResult(*result.baseline_results);
-    }
-    AddResult(result.results);
-    return result;
-#endif
-}
-
 BenchmarkResults::RunAndBaselineResults BenchmarkResults::Run(int argument, RunType run_type)
 {
     bool run_baseline_first = baseline_results && [&]
@@ -703,9 +637,7 @@ double RunResults::GetNanosecondsPerItem(BenchmarkResults * baseline_data) const
         auto found = baseline_data->results.find(argument);
         if (found == baseline_data->results.end())
         {
-            State state(baseline_data->FindGoodNumberOfIterations(argument, BenchmarkResults::default_run_time), argument);
-            baseline_data->benchmark->Run(state);
-            RunResults new_results = state.GetResults();
+            RunResults new_results = baseline_data->RunInNewProcess(baseline_data->FindGoodNumberOfIterations(argument, BenchmarkResults::default_run_time), argument);
             double diff = GetNanosecondsPerItem(nullptr) - new_results.GetNanosecondsPerItem(nullptr);
             baseline_data->AddResult(std::move(new_results));
             return diff;
@@ -722,9 +654,9 @@ double RunResults::GetNanosecondsPerItem(BenchmarkResults * baseline_data) const
 }
 
 LambdaBenchmark::LambdaBenchmark(std::function<void (State &)> func, BenchmarkCategories categories)
-    : Benchmark(std::move(categories))
-    , function(std::move(func))
+    : Benchmark(categories), function(std::move(func))
 {
+    AllBenchmarksNumbered().emplace_back(results, this);
 }
 
 void LambdaBenchmark::Run(State & state) const
@@ -737,33 +669,26 @@ BenchmarkInOtherProcess::BenchmarkInOtherProcess(BenchmarkCategories type, Bench
 {
     SetRange(range.begin, range.end);
     SetRangeMultiplier(range.multiplier);
-    for (BenchmarkResults * results : results) {
-        for (int i : GetAllArguments()) {
-            results->results[i];
-        }
+    // fill keys in map
+    for (int i : GetAllArguments()) {
+        results->results[i];
     }
 }
-
-void BenchmarkInOtherProcess::Run(State &) const
-{
-    CHECK_FOR_PROGRAMMER_ERROR(!"This should never be called. I know the types don't make sense");
-}
-
 
 void ListAllBenchmarks()
 {
     std::cout << "V1\n";
-    for (const BenchmarkResults * benchmark : AllBenchmarksNumbered())
+    for (const auto &[results, benchmark] : AllBenchmarksNumbered())
     {
-        if (benchmark->baseline_results) {
+        if (results->baseline_results) {
             std::cout << "BenchmarkWithBaseline\n"
-                      << benchmark->benchmark->GetArgumentRange().Serialize() << '\n'
-                      << benchmark->categories->Serialize() << '\n'
-                      << benchmark->baseline_results->categories->GetName().view() << '\n';
+                      << results->benchmark->GetArgumentRange().Serialize() << '\n'
+                      << results->categories->Serialize() << '\n'
+                      << results->baseline_results->categories->GetName().view() << '\n';
         } else {
             std::cout << "BenchmarkWithoutBaseline\n"
-                      << benchmark->benchmark->GetArgumentRange().Serialize() << '\n'
-                      << benchmark->categories->Serialize() << '\n';
+                      << results->benchmark->GetArgumentRange().Serialize() << '\n'
+                      << results->categories->Serialize() << '\n';
         }
     }
     std::cout.flush();
@@ -850,7 +775,7 @@ bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[])
         std::cout << "Not enough arguments. Format is --run-benchmark-then-exit <index> <name> <argument> <num_iterations>" << std::endl;
         return true;
     }
-    const std::vector<BenchmarkResults *> & all_benchmarks = AllBenchmarksNumbered();
+    const std::vector<std::pair<BenchmarkResults *, LambdaBenchmark *>> & all_benchmarks = AllBenchmarksNumbered();
     int index = 0;
     if (!StrToNumber(argv[2], index))
     {
@@ -867,10 +792,10 @@ bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[])
         std::cout << "Error: benchmark index is too big. Num benchmarks: " << all_benchmarks.size() << ", index: " << index << std::endl;
         return true;
     }
-    BenchmarkResults * benchmark = all_benchmarks[index];
-    if (benchmark->categories->GetName() != argv[3])
+    auto [results, benchmark] = all_benchmarks[index];
+    if (results->categories->GetName() != argv[3])
     {
-        std::cout << "Error: the benchmark had a different name than expected. Expected: " << argv[3] << ", actual: " << benchmark->categories->GetName() << std::endl;
+        std::cout << "Error: the benchmark had a different name than expected. Expected: " << argv[3] << ", actual: " << results->categories->GetName() << std::endl;
         return true;
     }
     int argument = 0;
@@ -888,18 +813,18 @@ bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[])
 
     std::cout << subprocess_start_string << argv[3] << subprocess_num_iterations_string << iteration_count;
     std::cout.flush();
-    RunResults results;
+    RunResults run_results;
     do
     {
         skb::State benchmark_state(iteration_count, argument);
-        benchmark->benchmark->Run(benchmark_state);
-        results = benchmark_state.GetResults();
+        benchmark->Run(benchmark_state);
+        run_results = benchmark_state.GetResults();
     }
     while(skb::IsProfileMode(index, argument));
 
-    std::cout << subprocess_time_string << results.time.count()
-              << subprocess_num_items_string << results.num_items_processed
-              << subprocess_num_bytes_string << results.num_bytes_used
+    std::cout << subprocess_time_string << run_results.time.count()
+              << subprocess_num_items_string << run_results.num_items_processed
+              << subprocess_num_bytes_string << run_results.num_bytes_used
               << '\n';
     std::cout.flush();
     return true;
