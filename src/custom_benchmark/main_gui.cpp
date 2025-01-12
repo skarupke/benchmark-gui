@@ -4,6 +4,7 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QDebug>
+#include "custom_benchmark/profile_mode.hpp"
 
 BenchmarkMainGui::CategoryCheckboxes::CategoryCheckboxes(interned_string tmp_category)
     : category(std::move(tmp_category)), no_setting_checkbox("None")
@@ -37,6 +38,7 @@ BenchmarkMainGui::BenchmarkMainGui()
     , normalize_checkbox("Normalize For Memory")
     , draw_points_checkbox("Draw as Points")
     , profile_mode("Profile Mode")
+    , xlimit_label("x-axis limit:")
     , xlimit("0")
 {
     setLayout(&layout);
@@ -77,7 +79,7 @@ BenchmarkMainGui::BenchmarkMainGui()
         checkboxes_widget->setLayout(checkboxes_layout);
         category_checkbox_area.setWidget(checkboxes_widget.get());
         layout.addWidget(&category_checkbox_area, 0, 0, 1, 2);
-        rhs_layout->addWidget(&benchmark_checkbox_area, rhs_checkbox_row, 0);
+        rhs_layout->addWidget(&benchmark_checkbox_area, rhs_checkbox_row, 0, 1, 2);
     };
     init_checkboxes();
 
@@ -91,7 +93,9 @@ BenchmarkMainGui::BenchmarkMainGui()
             std::string error_message = "There was an error loading the benchmarks:\n" + *error;
             QMessageBox::critical(this, "Failed to Load Benchmarks", QString::fromUtf8(error_message.data(), error_message.size()), QMessageBox::Ok);
         } else {
+            auto checkbox_state = GetCheckboxState();
             init_checkboxes();
+            SetCheckboxState(checkbox_state);
             NewFileLoaded(interned_string(as_string));
         }
     });
@@ -113,6 +117,12 @@ BenchmarkMainGui::BenchmarkMainGui()
     {
         graph.SetDrawAsPoints(state != 0);
     });
+    QObject::connect(&profile_mode, &QCheckBox::stateChanged, this, [&](int state)
+    {
+        if (state == 0) {
+            skb::DisableProfileMode();
+        }
+    });
 
     xlimit.setValidator(new QIntValidator());
     xlimit.setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
@@ -133,14 +143,15 @@ BenchmarkMainGui::BenchmarkMainGui()
     layout.addWidget(&category_checkbox_area, 0, 0, 1, 2);
     layout.addWidget(&graph, 1, 0);
     int row = 0;
-    rhs_layout->addWidget(&add_benchmarks, row++, 0);
+    rhs_layout->addWidget(&add_benchmarks, row++, 0, 1, 2);
     rhs_checkbox_row = row;
-    rhs_layout->addWidget(&benchmark_checkbox_area, row++, 0);
-    rhs_layout->addWidget(&xlimit, row++, 0);
-    rhs_layout->addWidget(&normalize_checkbox, row++, 0);
-    rhs_layout->addWidget(&draw_points_checkbox, row++, 0);
-    rhs_layout->addWidget(&profile_mode, row++, 0);
-    rhs_layout->addWidget(&reset_current, row++, 0);
+    rhs_layout->addWidget(&benchmark_checkbox_area, row++, 0, 1, 2);
+    rhs_layout->addWidget(&xlimit_label, row, 0);
+    rhs_layout->addWidget(&xlimit, row++, 1);
+    rhs_layout->addWidget(&normalize_checkbox, row++, 0, 1, 2);
+    rhs_layout->addWidget(&draw_points_checkbox, row++, 0, 1, 2);
+    rhs_layout->addWidget(&profile_mode, row++, 0, 1, 2);
+    rhs_layout->addWidget(&reset_current, row++, 0, 1, 2);
     layout.addLayout(rhs_layout, 1, 1);
 }
 
@@ -171,9 +182,9 @@ void BenchmarkMainGui::OnCategoryChanged(int)
 
 static const interned_string special_no_setting_checkbox_string = "__special_no_setting_checkbox_is_disabled__";
 
-std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> BenchmarkMainGui::GetCheckboxState() const
+BenchmarkMainGui::checkbox_state BenchmarkMainGui::GetCheckboxState() const
 {
-    std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> result;
+    checkbox_state result;
     for (auto & category : category_checkboxes)
     {
         std::map<interned_string, bool, interned_string::pointer_less> & to_insert = result[category.first];
@@ -185,10 +196,10 @@ std::map<interned_string, std::map<interned_string, bool, interned_string::point
     }
     return result;
 }
-void BenchmarkMainGui::SetCheckboxState(const std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> & categories_and_checkboxes)
+bool BenchmarkMainGui::CheckboxStateMatches(const checkbox_state & state)
 {
-    std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> old_state = GetCheckboxState();
-    bool state_is_compatible = std::equal(categories_and_checkboxes.begin(), categories_and_checkboxes.end(), old_state.begin(), old_state.end(), [](const auto & a, const auto & b)
+    checkbox_state old_state = GetCheckboxState();
+    return std::equal(state.begin(), state.end(), old_state.begin(), old_state.end(), [](const auto & a, const auto & b)
     {
         return a.first == b.first &&
                 std::equal(a.second.begin(), a.second.end(), b.second.begin(), b.second.end(), [](const auto & a, const auto & b)
@@ -196,16 +207,21 @@ void BenchmarkMainGui::SetCheckboxState(const std::map<interned_string, std::map
             return a.first == b.first;
         });
     });
-    if (!state_is_compatible)
-        return;
-
+}
+void BenchmarkMainGui::SetCheckboxState(const checkbox_state & categories_and_checkboxes)
+{
     for (auto & category : category_checkboxes)
     {
-        const std::map<interned_string, bool, interned_string::pointer_less> & state = categories_and_checkboxes.at(category.first);
-        category.second.no_setting_checkbox.setChecked(state.at(special_no_setting_checkbox_string));
+        auto found_category = categories_and_checkboxes.find(category.first);
+        if (found_category == categories_and_checkboxes.end())
+            continue;
+        category.second.no_setting_checkbox.setChecked(found_category->second.at(special_no_setting_checkbox_string));
         for (auto & checkbox : category.second.checkboxes)
         {
-            checkbox.second.setChecked(state.at(checkbox.first));
+            auto found_checkbox = found_category->second.find(checkbox.first);
+            if (found_checkbox == found_category->second.end())
+                continue;
+            checkbox.second.setChecked(found_checkbox->second);
         }
     }
 }

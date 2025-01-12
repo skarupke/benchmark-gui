@@ -187,7 +187,7 @@ struct BenchmarkResults
 
     enum RunType
     {
-        SeparateProcess,
+        Normal,
         ProfileMode
     };
 
@@ -219,6 +219,7 @@ struct BenchmarkCategories
     const interned_string & GetName() const;
     const interned_string & GetType() const;
     const interned_string & GetCompiler() const;
+    const interned_string & GetOptimizer() const;
     const ska::flat_hash_map<interned_string, interned_string> & GetCategories() const
     {
         return categories;
@@ -227,6 +228,7 @@ struct BenchmarkCategories
     static const interned_string & TypeIndex();
     static const interned_string & NameIndex();
     static const interned_string & CompilerIndex();
+    static const interned_string & OptimizerIndex();
 
     std::string CategoriesString() const;
 

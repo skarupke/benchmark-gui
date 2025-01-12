@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QLineEdit>
+#include <QLabel>
 #include <memory>
 
 class BenchmarkMainGui : public QWidget
@@ -27,8 +28,11 @@ public:
         return profile_mode.isChecked();
     }
 
-    std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> GetCheckboxState() const;
-    void SetCheckboxState(const std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less> & categories_and_checkboxes);
+    using checkbox_state = std::map<interned_string, std::map<interned_string, bool, interned_string::pointer_less>, interned_string::pointer_less>;
+
+    checkbox_state GetCheckboxState() const;
+    bool CheckboxStateMatches(const checkbox_state & state);
+    void SetCheckboxState(const checkbox_state & categories_and_checkboxes);
 
 private:
     QScrollArea benchmark_checkbox_area;
@@ -43,6 +47,7 @@ private:
     QCheckBox normalize_checkbox;
     QCheckBox draw_points_checkbox;
     QCheckBox profile_mode;
+    QLabel xlimit_label;
     QLineEdit xlimit;
 
     BenchmarkGraph graph;

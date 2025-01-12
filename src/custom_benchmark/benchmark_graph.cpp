@@ -378,39 +378,31 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
                 auto end = benchmark->results.end();
                 for (auto it = begin; it != end; ++it)
                 {
-                    if (it->first <= 0)
+                    if (it->first <= 0 || it->second.empty())
                         continue;
                     auto next = std::next(it);
                     double jitter = 0.0;
-                    double jitter_amount = 0.25;
-                    if (it == begin)
-                    {
-                        if (next != end)
-                        {
-                            jitter = next->first / it->first;
+                    double jitter_amount = 0.4;
+                    if (it == begin) {
+                        if (next != end) {
+                            jitter = static_cast<double>(next->first) / it->first;
                         }
                     }
-                    else if (next != end)
+                    else if (next != end && next->first < xlimit)
                     {
-                        if (color_choice & 1)
-                        {
-                            auto prev = std::prev(it);
-                            jitter = it->first / prev->first;
+                        if (color_choice & 1) {
+                            jitter = std::prev(it)->first / static_cast<double>(it->first);
                         }
-                        else
-                        {
-                            jitter = next->first / it->first;
+                        else {
+                            jitter = static_cast<double>(next->first) / it->first;
                         }
                     }
-                    else
-                    {
-                        auto prev = std::prev(it);
-                        jitter = it->first / prev->first;
+                    else {
+                        jitter = std::prev(it)->first / static_cast<double>(it->first);
                     }
                     double jitter_fraction = color_choice / static_cast<double>(std::extent<decltype(colors)>::value);
                     jitter = std::pow(jitter, jitter_amount * jitter_fraction);
-                    const auto & range = it->second;
-                    for (const skb::RunResults & result : range)
+                    for (const skb::RunResults & result : it->second)
                     {
                         int xvalue = result.argument;
                         double yvalue = yval_from_result(result, baseline);

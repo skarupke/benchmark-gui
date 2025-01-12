@@ -89,6 +89,13 @@
         "qcheckbox": "cpp",
         "qpushbutton": "cpp",
         "qscrollarea": "cpp",
-        "qcombobox": "cpp"
+        "qcombobox": "cpp",
+        "qlineedit": "cpp",
+        "qwidget": "cpp",
+        "hash_set": "cpp",
+        "queue": "cpp",
+        "stack": "cpp",
+        "forward_list": "cpp",
+        "format": "cpp"
     }
 }

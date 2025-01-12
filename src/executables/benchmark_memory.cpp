@@ -1,16 +1,14 @@
 #include <random>
 #include <numeric>
 #include <vector>
-#include "util/random_seed_seq.hpp"
 
 #include "custom_benchmark/custom_benchmark.h"
 #include "test/include_test.hpp"
+#include "hashtable_benchmarks/benchmark_shared.hpp"
 
 
 static constexpr const size_t num_loops = 10000;
 static constexpr size_t memory_benchmark_multiplier = 16;
-
-thread_local std::mt19937_64 global_randomness(random_seed_seq::get_instance());
 
 void benchmark_memory_access(skb::State & state)
 {

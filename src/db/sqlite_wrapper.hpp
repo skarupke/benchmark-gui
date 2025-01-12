@@ -70,6 +70,7 @@ struct SqLite
     }
 
     SqLiteStatement prepare(StringView<const char> text);
+    void prepare_and_run(StringView<const char> text);
     std::pair<SqLiteStatement, StringView<const char>> prepare_part(StringView<const char> text);
 
 private:

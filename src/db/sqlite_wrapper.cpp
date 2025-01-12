@@ -50,6 +50,10 @@ std::pair<SqLiteStatement, StringView<const char>> SqLite::prepare_part(StringVi
     return {SqLiteStatement(statement), StringView<const char>{remainder, text.end()}};
 }
 
+void SqLite::prepare_and_run(StringView<const char> text) {
+    RAW_VERIFY(!prepare(text).step());
+}
+
 bool SqLiteStatement::step()
 {
     int result = sqlite3_step(statement.get());

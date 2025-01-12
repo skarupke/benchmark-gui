@@ -9,6 +9,10 @@
 #include <sys/wait.h>
 #include <sstream>
 #include <charconv>
+#include "util/random_seed_seq.hpp"
+#include "custom_benchmark/profile_mode.hpp"
+
+thread_local std::mt19937_64 global_randomness(random_seed_seq::get_instance());
 
 namespace skb
 {
@@ -20,6 +24,24 @@ const char * const LIST_ALL_BENCHMARKS = "--list-all-benchmarks";
 const char * const RUN_BENCHMARK_THEN_EXIT = "--run-benchmark-then-exit";
 
 const float BenchmarkResults::default_run_time = 0.25f;
+
+static interned_string CurrentCompiler() {
+#ifdef __clang__
+    static interned_string current_compiler("clang");
+#elif defined(__GNUC__) || defined(__GNUG__)
+    static interned_string current_compiler("gcc");
+#endif
+    return current_compiler;
+}
+
+static interned_string DebugOrRelease() {
+#ifdef DEBUG_BUILD
+    static interned_string debug_or_release("debug");
+#else
+    static interned_string debug_or_release("release");
+#endif
+    return debug_or_release;
+}
 
 State::State(int num_iterations, int argument)
     : num_iterations(std::max(1, num_iterations))
@@ -42,6 +64,11 @@ const interned_string & BenchmarkCategories::CompilerIndex()
     static const interned_string result = "compiler";
     return result;
 }
+const interned_string & BenchmarkCategories::OptimizerIndex()
+{
+    static const interned_string result = "optimizer";
+    return result;
+}
 const interned_string & FilenameIndex()
 {
     static const interned_string result = "filename";
@@ -50,8 +77,8 @@ const interned_string & FilenameIndex()
 BenchmarkCategories::BenchmarkCategories() = default;
 BenchmarkCategories::BenchmarkCategories(interned_string type, interned_string name)
 {
-    categories[TypeIndex()] = std::move(type);
-    categories[NameIndex()] = std::move(name);
+    categories[TypeIndex()] = type;
+    categories[NameIndex()] = name;
 }
 const interned_string & BenchmarkCategories::GetName() const
 {
@@ -68,6 +95,12 @@ const interned_string & BenchmarkCategories::GetType() const
 const interned_string & BenchmarkCategories::GetCompiler() const
 {
     auto found = categories.find(CompilerIndex());
+    CHECK_FOR_PROGRAMMER_ERROR(found != categories.end());
+    return found->second;
+}
+const interned_string & BenchmarkCategories::GetOptimizer() const
+{
+    auto found = categories.find(OptimizerIndex());
     CHECK_FOR_PROGRAMMER_ERROR(found != categories.end());
     return found->second;
 }
@@ -149,12 +182,6 @@ skb::BenchmarkCategories CategoryBuilder::BuildCategories(interned_string type, 
     return result;
 }
 
-static const std::vector<interned_string> & AllCompilers()
-{
-    static std::vector<interned_string> result = { "gcc", "clang" };
-    return result;
-}
-
 std::map<interned_string, std::vector<BenchmarkResults *>, interned_string::pointer_less> & AllBaselineBenchmarks()
 {
     static std::map<interned_string, std::vector<BenchmarkResults *>, interned_string::pointer_less> result;
@@ -169,14 +196,12 @@ static std::vector<BenchmarkResults *> & AllBenchmarksNumbered()
 
 Benchmark::Benchmark(BenchmarkCategories categories)
 {
-    for (const interned_string & compiler : AllCompilers())
-    {
-        BenchmarkCategories compiler_categories = categories;
-        compiler_categories.AddCategory(BenchmarkCategories::CompilerIndex(), compiler);
-        skb::BenchmarkResults * new_results = AddToAllBenchmarks(compiler_categories);
-        new_results->my_global_index = AllBenchmarksNumbered().size();
-        AllBenchmarksNumbered().push_back(new_results);
-    }
+    BenchmarkCategories compiler_categories = categories;
+    compiler_categories.AddCategory(BenchmarkCategories::CompilerIndex(), CurrentCompiler());
+    compiler_categories.AddCategory(BenchmarkCategories::OptimizerIndex(), DebugOrRelease());
+    skb::BenchmarkResults * new_results = AddToAllBenchmarks(compiler_categories);
+    new_results->my_global_index = AllBenchmarksNumbered().size();
+    AllBenchmarksNumbered().push_back(new_results);
 }
 Benchmark::Benchmark(BenchmarkCategories type, interned_string executable, int index_in_executable)
 {
@@ -215,6 +240,8 @@ Benchmark * Benchmark::SetBaseline(interned_string name_of_baseline_benchmark)
         for (BenchmarkResults * baseline : found->second)
         {
             if (baseline->categories->GetCompiler() != result->categories->GetCompiler())
+                continue;
+            if (baseline->categories->GetOptimizer() != result->categories->GetOptimizer())
                 continue;
 
             result->baseline_results = baseline;
@@ -535,28 +562,17 @@ BenchmarkResults::RunAndBaselineResults BenchmarkResults::Run(int argument, RunT
     auto run_baseline = [&]
     {
         int baseline_good_number = baseline_results->FindGoodNumberOfIterations(argument, default_run_time);
-        if (run_type == SeparateProcess)
-        {
-            function_result.baseline_results.reset(new RunResults(baseline_results->RunInNewProcess(baseline_good_number, argument)));
-        }
-        else
-        {
-            skb::State baseline_state(baseline_good_number, argument);
-            baseline_results->benchmark->Run(baseline_state);
-            function_result.baseline_results.reset(new RunResults(baseline_state.GetResults()));
-        }
+        function_result.baseline_results.reset(new RunResults(baseline_results->RunInNewProcess(baseline_good_number, argument)));
+
     };
     if (run_baseline_first)
         run_baseline();
     int good_number = FindGoodNumberOfIterations(argument, run_type == ProfileMode ? 10.0f : default_run_time);
-    if (run_type == SeparateProcess)
-        function_result.results = RunInNewProcess(good_number, argument);
-    else
-    {
-        skb::State benchmark_state(good_number, argument);
-        benchmark->Run(benchmark_state);
-        function_result.results = benchmark_state.GetResults();
+    if (run_type == ProfileMode) {
+        skb::EnableProfileMode(my_global_index, argument);
     }
+    function_result.results = RunInNewProcess(good_number, argument);
+
     if (baseline_results)
     {
         if (!run_baseline_first)
@@ -870,11 +886,16 @@ bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[])
         return true;
     }
 
-    skb::State benchmark_state(iteration_count, argument);
     std::cout << subprocess_start_string << argv[3] << subprocess_num_iterations_string << iteration_count;
     std::cout.flush();
-    benchmark->benchmark->Run(benchmark_state);
-    RunResults results = benchmark_state.GetResults();
+    RunResults results;
+    do
+    {
+        skb::State benchmark_state(iteration_count, argument);
+        benchmark->benchmark->Run(benchmark_state);
+        results = benchmark_state.GetResults();
+    }
+    while(skb::IsProfileMode(index, argument));
 
     std::cout << subprocess_time_string << results.time.count()
               << subprocess_num_items_string << results.num_items_processed
