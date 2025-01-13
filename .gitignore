@@ -1,12 +1,11 @@
 .idea
 .tup
 build-gcc
-build-gcc-coverage
 build-gcc-debug
 build-clang-debug
 build-clang
+build-clang-no-cmov-converter
 build-address-sanitizer-debug
-build-fuzzer-debug
 *.creator.user*
 callgrind.out.*
 benchmark_timings.db

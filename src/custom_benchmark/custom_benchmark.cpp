@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sstream>
-#include <charconv>
 #include "util/random_seed_seq.hpp"
 #include "custom_benchmark/profile_mode.hpp"
 
@@ -35,11 +34,12 @@ static interned_string CurrentCompiler() {
 }
 
 static interned_string DebugOrRelease() {
-#ifdef DEBUG_BUILD
-    static interned_string debug_or_release("debug");
-#else
-    static interned_string debug_or_release("release");
-#endif
+    #ifndef BENCHMARK_OPTIMIZER_STRING
+    static_assert(false, "Need to define the BENCHMARK_OPTIMIZER_STRING");
+    #endif
+    #define STRINGIFY_DEFINE2(X) #X
+    #define STRINGIFY_DEFINE(X) STRINGIFY_DEFINE2(X)
+    static interned_string debug_or_release(STRINGIFY_DEFINE(BENCHMARK_OPTIMIZER_STRING));
     return debug_or_release;
 }
 

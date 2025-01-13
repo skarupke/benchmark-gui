@@ -5,5 +5,3 @@ CPP_COMPILER = 'clang++'
 --DEFINES += 'BOOST_NO_EXCEPTIONS'
 
 --CPP_FLAGS += '--analyze'
-CPP_FLAGS += '-mllvm'
-CPP_FLAGS += '-x86-cmov-converter=false'
