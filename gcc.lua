@@ -1,2 +1,2 @@
-CPP_COMPILER = 'g++-14'
+CPP_COMPILER = 'g++'
 CPP_FLAGS += '-pipe'

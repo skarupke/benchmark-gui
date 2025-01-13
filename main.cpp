@@ -277,6 +277,7 @@ int main(int argc, char * argv[])
         }
     });
 
+    root.setWindowTitle("Benchmarks");
     root.show();
     result = app.exec();
     if (result)

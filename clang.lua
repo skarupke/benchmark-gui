@@ -1,4 +1,4 @@
-CPP_COMPILER = '/usr/bin/clang++-18'
+CPP_COMPILER = 'clang++'
 
 --CPP_FLAGS += '-fno-exceptions'
 --DEFINES += 'SIG_NO_EXCEPTIONS'

@@ -29,11 +29,9 @@ INCLUDE_DIRS += tup.getcwd() .. '/libs'
 INCLUDE_DIRS += tup.getcwd() .. '/libs/benchmark/include'
 
 SYSTEM_INCLUDE_DIRS += tup.getcwd() .. '/libs/gtest'
-SYSTEM_INCLUDE_DIRS += tup.getcwd() .. '/libs/RegionSort'
 SYSTEM_INCLUDE_DIRS += COPPERSPICE_DIRECTORY .. 'include'
 SYSTEM_INCLUDE_DIRS += COPPERSPICE_DIRECTORY .. 'include/QtCore'
 SYSTEM_INCLUDE_DIRS += COPPERSPICE_DIRECTORY .. 'include/QtGui'
-SYSTEM_INCLUDE_DIRS += '/home/malte/workspace/iaca-lin64'
 
 INPUT_FOLDERS += './'
 INPUT_FOLDERS += 'src/'
@@ -48,7 +46,6 @@ INPUT_FOLDERS += 'src/test/'
 INPUT_FOLDERS += 'src/thread/'
 INPUT_FOLDERS += 'src/util/'
 INPUT_FOLDERS += 'libs/benchmark/src/'
-INPUT_FOLDERS += 'libs/Raduls/'
 
 EXECUTABLE_FOLDER = 'src/executables/'
 
