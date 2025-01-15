@@ -74,7 +74,7 @@ local debug_symbols = true
 if debug_symbols then
     CPP_FLAGS += '-g'
     --CPP_FLAGS += '-fdebug-prefix-map=./src/=../src/'
-    --CPP_FLAGS += '-fdebug-prefix-map=src/=../src/'
+    CPP_FLAGS += '-fdebug-prefix-map=src/=../src/'
     --CPP_FLAGS += '-fdebug-prefix-map=./libs/=../libs/'
     --CPP_FLAGS += '-fdebug-prefix-map=libs/=../libs/'
     --CPP_FLAGS += '-fdebug-prefix-map=./main=../main'

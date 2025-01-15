@@ -10,7 +10,7 @@
 static constexpr const size_t num_loops = 10000;
 static constexpr size_t memory_benchmark_multiplier = 16;
 
-void benchmark_memory_access(skb::State & state)
+void benchmark_random_memory_access(skb::State & state)
 {
     size_t num_bytes = state.range(0) / sizeof(size_t);
     num_bytes *= memory_benchmark_multiplier;
@@ -248,7 +248,7 @@ SKA_BENCHMARK("baseline", benchmark_memory_access_baseline);
 SKA_BENCHMARK("baseline", benchmark_predictable_memory_access_baseline);
 SKA_BENCHMARK("baseline", benchmark_sequential_memory_access_baseline);
 SKA_BENCHMARK("baseline", benchmark_memory_access_permutation_baseline);
-SKA_BENCHMARK("memory access", benchmark_memory_access)->SetBaseline("benchmark_memory_access_baseline")->SetRange(memory_access_min, memory_access_max)->SetRangeMultiplier(2.0);
+SKA_BENCHMARK("memory access", benchmark_random_memory_access)->SetBaseline("benchmark_memory_access_baseline")->SetRange(memory_access_min, memory_access_max)->SetRangeMultiplier(2.0);
 SKA_BENCHMARK("memory access", benchmark_memory_access_permutation)->SetBaseline("benchmark_memory_access_permutation_baseline")->SetRange(memory_access_min, memory_access_max)->SetRangeMultiplier(2.0);
 SKA_BENCHMARK("memory access", benchmark_predictable_memory_access)->SetBaseline("benchmark_predictable_memory_access_baseline")->SetRange(memory_access_min, memory_access_max)->SetRangeMultiplier(2.0);
 SKA_BENCHMARK("memory access", benchmark_sequential_memory_access)->SetBaseline("benchmark_sequential_memory_access_baseline")->SetRange(memory_access_min, memory_access_max)->SetRangeMultiplier(2.0);

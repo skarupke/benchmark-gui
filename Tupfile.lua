@@ -20,8 +20,6 @@ LINK_FLAGS += '-Wl,-pie'
 LINK_LIBS += '-lCsGui1.4'
 LINK_LIBS += '-lCsCore1.4'
 LINK_LIBS += '-lsqlite3'
-LINK_LIBS += '-lboost_system'
-LINK_LIBS += '-lboost_thread'
 LINK_LIBS += '-lstdc++fs'
 
 INCLUDE_DIRS += tup.getcwd() .. '/src'

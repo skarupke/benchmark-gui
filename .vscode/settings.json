@@ -98,6 +98,27 @@
         "forward_list": "cpp",
         "format": "cpp",
         "qapplication": "cpp",
-        "qaction": "cpp"
+        "qaction": "cpp",
+        "qpainter": "cpp",
+        "qscopedpointer": "cpp",
+        "qshareddata": "cpp",
+        "csignal": "cpp",
+        "cstdarg": "cpp",
+        "any": "cpp",
+        "strstream": "cpp",
+        "complex": "cpp",
+        "numeric": "cpp",
+        "optional": "cpp",
+        "random": "cpp",
+        "source_location": "cpp",
+        "fstream": "cpp",
+        "future": "cpp",
+        "scoped_allocator": "cpp",
+        "shared_mutex": "cpp",
+        "cfenv": "cpp",
+        "cinttypes": "cpp",
+        "typeindex": "cpp",
+        "variant": "cpp",
+        "__nullptr": "cpp"
     }
 }

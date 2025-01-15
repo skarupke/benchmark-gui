@@ -237,6 +237,22 @@ QString readable_yvalue(double yvalue)
     snprintf(buffer, sizeof(buffer), "%g", yvalue);
     return QString::fromUtf8(buffer);
 }
+QString readable_xvalue(double xvalue)
+{
+    CHECK_FOR_PROGRAMMER_ERROR(xvalue >= 1.0);
+    char buffer[128];
+    char * to_write = buffer + 128;
+    *--to_write = '\0';
+    int count = 4;
+    for (int64_t x = static_cast<int64_t>(xvalue); x; x /= 10) {
+        if (--count == 0) {
+            *--to_write = ',';
+            count = 3;
+        }
+        *--to_write = '0' + x % 10;
+    }
+    return QString::fromUtf8(to_write);
+}
 
 GraphLabelPos GetYStep(double ymin, double ymax, int height)
 {
@@ -352,7 +368,7 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
             double screen_y = position_y(ymin);
             graph_painter.drawLine(QPointF(screen_x, screen_y), QPointF(screen_x, screen_y + tick_length));
             QRectF bounding_rect(QPointF(screen_x - 100.0, screen_y + tick_length), QPointF(screen_x + 100.0, size().height()));
-            graph_painter.drawText(bounding_rect, Qt::AlignTop | Qt::AlignHCenter, QString::fromUtf8(std::to_string(static_cast<int64_t>(x)).c_str()));
+            graph_painter.drawText(bounding_rect, Qt::AlignTop | Qt::AlignHCenter, readable_xvalue(x));
         }
         for (double y = ylabels.min; y <= ylabels.max; y = ylabels.step(y))
         {
@@ -544,4 +560,16 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
         setContextMenuPolicy(Qt::NoContextMenu);
         last_emitted = nullptr;
     }
+}
+
+#include "test/include_test.hpp"
+
+TEST(benchmark_graph, x_formatting)
+{
+    ASSERT_EQ("5", readable_xvalue(5.0));
+    ASSERT_EQ("50", readable_xvalue(50.0));
+    ASSERT_EQ("100", readable_xvalue(100.0));
+    ASSERT_EQ("9,102", readable_xvalue(9102.0));
+    ASSERT_EQ("1,048,576", readable_xvalue(1024.0 * 1024.0));
+    ASSERT_EQ("1,073,741,824", readable_xvalue(1024.0 * 1024.0 * 1024.0));
 }
