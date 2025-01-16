@@ -54,7 +54,7 @@ struct BenchmarkResults;
 struct RunResults
 {
     int num_iterations;
-    int argument;
+    int64_t argument;
     std::chrono::nanoseconds time;
     size_t num_items_processed;
     size_t num_bytes_used;
@@ -64,7 +64,7 @@ struct RunResults
 
 struct State
 {
-    State(int num_iterations, int argument);
+    State(int num_iterations, int64_t argument);
 
     inline bool KeepRunning()
     {
@@ -122,11 +122,11 @@ struct State
         return num_bytes_used;
     }
 
-    int GetArgument() const
+    int64_t GetArgument() const
     {
         return argument;
     }
-    int range(size_t which) const
+    int64_t range(size_t which) const
     {
         if (which == 0)
             return argument;
@@ -146,7 +146,7 @@ struct State
 private:
     int current_iterations = 0;
     int num_iterations = 1;
-    int argument = 0;
+    int64_t argument = 0;
     std::chrono::high_resolution_clock::time_point start;
     std::chrono::nanoseconds total_time;
     std::chrono::high_resolution_clock::time_point pause_start;
@@ -172,7 +172,7 @@ struct BenchmarkResults
     const BenchmarkCategories * categories = nullptr;
     BenchmarkResults * baseline_results = nullptr;
 
-    int FindGoodNumberOfIterations(int argument, float desired_running_time) const;
+    int FindGoodNumberOfIterations(int64_t argument, float desired_running_time) const;
     void AddResult(RunResults results);
     void ClearResults();
     static void MoveMedianToFront(std::vector<RunResults> & results);
@@ -189,13 +189,13 @@ struct BenchmarkResults
         ProfileMode
     };
 
-    RunAndBaselineResults Run(int argument, RunType run_type);
-    RunResults RunInNewProcess(int num_iterations, int argument) const;
+    RunAndBaselineResults Run(int64_t argument, RunType run_type);
+    RunResults RunInNewProcess(int num_iterations, int64_t argument) const;
 
     sig2::Signal<BenchmarkResults *> results_added_signal;
 
     mutable std::mutex results_mutex;
-    std::map<int, std::vector<RunResults>> results;
+    std::map<int64_t, std::vector<RunResults>> results;
 
     int my_global_index = -1;
     interned_string executable;
@@ -258,7 +258,7 @@ struct Benchmark
 
     Benchmark * SetBaseline(interned_string name_of_baseline_benchmark);
 
-    Benchmark * SetRange(int range_begin, int range_end)
+    Benchmark * SetRange(int64_t range_begin, int64_t range_end)
     {
         this->range_begin = range_begin;
         this->range_end = range_end;
@@ -271,11 +271,11 @@ struct Benchmark
         return this;
     }
 
-    std::vector<int> GetAllArguments() const;
+    std::vector<int64_t> GetAllArguments() const;
 
     struct RangeOfArguments {
-        int begin;
-        int end;
+        int64_t begin;
+        int64_t end;
         double multiplier;
 
         std::string Serialize() const;
@@ -286,8 +286,8 @@ struct Benchmark
 private:
     interned_string baseline;
 
-    int range_begin = 0;
-    int range_end = 0;
+    int64_t range_begin = 0;
+    int64_t range_end = 0;
     double range_multiplier = 0;
 
 protected:
@@ -295,7 +295,7 @@ protected:
 
 private:
     mutable std::mutex arguments_mutex;
-    mutable std::vector<int> all_arguments;
+    mutable std::vector<int64_t> all_arguments;
 
     void AddToAllBenchmarks(const BenchmarkCategories & categories);
 };

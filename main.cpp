@@ -17,7 +17,7 @@
 #include "db/benchmark_db.hpp"
 #include "thread/ticket_mutex.hpp"
 
-void RunOne(skb::BenchmarkResults & benchmark_data, int argument, bool profile_mode)
+void RunOne(skb::BenchmarkResults & benchmark_data, int64_t argument, bool profile_mode)
 {
     std::string message = benchmark_data.categories->CategoriesString();
     message += '/';
@@ -69,7 +69,7 @@ void load_from_db(BenchmarkDB & db, interned_string filename)
         while (db.load_result.step())
         {
             int num_iterations = db.load_result.GetInt(0);
-            int argument = db.load_result.GetInt(1);
+            int64_t argument = db.load_result.GetInt64(1);
             int64_t time = db.load_result.GetInt64(2);
             int64_t num_items_processed = db.load_result.GetInt64(3);
             int64_t num_bytes_used = db.load_result.GetInt64(4);
@@ -197,7 +197,7 @@ int main(int argc, char * argv[])
     std::atomic<bool> keep_running(true);
     ticket_mutex results_mutex;
     std::mutex run_first_mutex;
-    std::deque<std::pair<skb::BenchmarkResults *, int>> run_argument_first;
+    std::deque<std::pair<skb::BenchmarkResults *, int64_t>> run_argument_first;
 
     QObject::connect(&root, &BenchmarkMainGui::NewFileLoaded, &root, [&](interned_string filename)
     {
@@ -205,7 +205,7 @@ int main(int argc, char * argv[])
         load_from_db(permanent_storage, filename);
         read_checkbox_state(root, permanent_storage);
     });
-    QObject::connect(&root.GetGraph(), &BenchmarkGraph::RunBenchmarkFirst, &root, [&](skb::BenchmarkResults * benchmark, int argument)
+    QObject::connect(&root.GetGraph(), &BenchmarkGraph::RunBenchmarkFirst, &root, [&](skb::BenchmarkResults * benchmark, int64_t argument)
     {
         std::lock_guard<std::mutex> lock(run_first_mutex);
         run_argument_first.push_back({ benchmark, argument });
@@ -229,7 +229,7 @@ int main(int argc, char * argv[])
                     }
                     else
                     {
-                        std::pair<skb::BenchmarkResults *, int> result = run_argument_first.front();
+                        std::pair<skb::BenchmarkResults *, int64_t> result = run_argument_first.front();
                         run_argument_first.pop_front();
                         return result;
                     }
@@ -237,9 +237,9 @@ int main(int argc, char * argv[])
             }
             const std::vector<skb::BenchmarkResults *> & visible = root.GetGraph().GetData();
             skb::BenchmarkResults * min_result = nullptr;
-            int min_argument = 0;
+            int64_t min_argument = 0;
             size_t min_size = NumBenchmarksToKeep + 12;
-            int xlimit = root.GetGraph().GetXLimit();
+            int64_t xlimit = root.GetGraph().GetXLimit();
             for (skb::BenchmarkResults * result : visible)
             {
                 for (const auto & [argument, repeat_results] : result->results)
@@ -260,15 +260,15 @@ int main(int argc, char * argv[])
             if (min_result)
                 return std::make_pair(min_result, min_argument);
             else
-                return std::pair<skb::BenchmarkResults *, int>(nullptr, 0);
+                return std::pair<skb::BenchmarkResults *, int64_t>(nullptr, 0);
         };
 
         while (keep_running)
         {
             std::unique_lock<ticket_mutex> lock(results_mutex);
-            std::pair<skb::BenchmarkResults *, int> next = get_next_to_run();
-            if (next.first) {
-                RunOne(*next.first, next.second, root.ProfileMode());
+            auto [results, argument] = get_next_to_run();
+            if (results) {
+                RunOne(*results, argument, root.ProfileMode());
             }
             else {
                 lock.unlock();

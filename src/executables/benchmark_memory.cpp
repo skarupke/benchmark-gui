@@ -8,15 +8,13 @@
 
 
 static constexpr const size_t num_loops = 10000;
-static constexpr size_t memory_benchmark_multiplier = 16;
 
 void benchmark_random_memory_access(skb::State & state)
 {
-    size_t num_bytes = state.range(0) / sizeof(size_t);
-    num_bytes *= memory_benchmark_multiplier;
-    std::vector<size_t> bytes(num_bytes);
+    size_t num_size_ts = state.range(0) / sizeof(size_t);
+    std::vector<size_t> bytes(num_size_ts);
     std::iota(bytes.begin(), bytes.end(), size_t(100));
-    std::uniform_int_distribution<size_t> random_index(0, num_bytes - 1);
+    std::uniform_int_distribution<size_t> random_index(0, num_size_ts - 1);
     while (state.KeepRunning())
     {
         for (size_t i = 0; i < num_loops; ++i)
@@ -26,16 +24,15 @@ void benchmark_random_memory_access(skb::State & state)
 }
 void benchmark_memory_access_permutation(skb::State & state)
 {
-    size_t num_bytes = state.range(0) / sizeof(size_t);
-    num_bytes *= memory_benchmark_multiplier;
-    std::vector<size_t> bytes(num_bytes);
+    size_t num_size_ts = state.range(0) / sizeof(size_t);
+    std::vector<size_t> bytes(num_size_ts);
     {
-        std::vector<size_t> offsets(num_bytes);
+        std::vector<size_t> offsets(num_size_ts);
         std::iota(offsets.begin(), offsets.end(), size_t());
         std::shuffle(offsets.begin(), offsets.end(), global_randomness);
-        for (size_t i = 0; i < num_bytes; ++i)
+        for (size_t i = 0; i < num_size_ts; ++i)
         {
-            size_t other_index = i == 0 ? num_bytes - 1 : i - 1;
+            size_t other_index = i == 0 ? num_size_ts - 1 : i - 1;
             size_t & found = bytes[offsets[i]];
             CHECK_FOR_PROGRAMMER_ERROR(found == 0);
             found = offsets[other_index];
@@ -56,11 +53,10 @@ void benchmark_memory_access_permutation(skb::State & state)
 #if 1
 void benchmark_predictable_memory_access(skb::State & state)
 {
-    size_t num_bytes = state.range(0) / sizeof(size_t);
-    num_bytes *= memory_benchmark_multiplier;
-    std::vector<size_t> bytes(num_bytes);
+    size_t num_size_ts = state.range(0) / sizeof(size_t);
+    std::vector<size_t> bytes(num_size_ts);
     std::iota(bytes.begin(), bytes.end(), size_t(100));
-    std::uniform_int_distribution<size_t> random_index(0, num_bytes - 1);
+    std::uniform_int_distribution<size_t> random_index(0, num_size_ts - 1);
     constexpr size_t num_indices = 16 * 1024 * 1024;
     std::vector<size_t> indices(num_indices);
     for (size_t & index : indices)
@@ -173,34 +169,31 @@ void benchmark_cache_miss(benchmark::State & state)
 #endif
 void benchmark_sequential_memory_access(skb::State & state)
 {
-    size_t num_bytes = state.range(0) / sizeof(size_t);
-    num_bytes *= memory_benchmark_multiplier;
-    std::vector<size_t> bytes(num_bytes);
+    size_t num_size_ts = state.range(0) / sizeof(size_t);
+    std::vector<size_t> bytes(num_size_ts);
     std::iota(bytes.begin(), bytes.end(), size_t(100));
     while (state.KeepRunning())
     {
         for (size_t i : bytes)
             skb::DoNotOptimize(i);
     }
-    state.SetItemsProcessed(state.iterations() * num_bytes);
+    state.SetItemsProcessed(state.iterations() * num_size_ts);
 }
 void benchmark_sequential_memory_access_baseline(skb::State & state)
 {
-    size_t num_bytes = state.range(0) / sizeof(size_t);
-    num_bytes *= memory_benchmark_multiplier;
+    size_t num_size_ts = state.range(0) / sizeof(size_t);
     while (state.KeepRunning())
     {
-        for (size_t i = 0; i < num_bytes; ++i)
+        for (size_t i = 0; i < num_size_ts; ++i)
             skb::DoNotOptimize(i);
     }
-    state.SetItemsProcessed(state.iterations() * num_bytes);
+    state.SetItemsProcessed(state.iterations() * num_size_ts);
 }
 
 void benchmark_memory_access_baseline(skb::State & state)
 {
-    size_t num_bytes = state.range(0) / sizeof(size_t);
-    num_bytes *= memory_benchmark_multiplier;
-    std::uniform_int_distribution<size_t> random_index(0, num_bytes - 1);
+    size_t num_size_ts = state.range(0) / sizeof(size_t);
+    std::uniform_int_distribution<size_t> random_index(0, num_size_ts - 1);
 
     while (state.KeepRunning())
     {
@@ -211,9 +204,8 @@ void benchmark_memory_access_baseline(skb::State & state)
 }
 void benchmark_predictable_memory_access_baseline(skb::State & state)
 {
-    size_t num_bytes = state.range(0) / sizeof(size_t);
-    num_bytes *= memory_benchmark_multiplier;
-    std::uniform_int_distribution<size_t> random_index(0, num_bytes - 1);
+    size_t num_size_ts = state.range(0) / sizeof(size_t);
+    std::uniform_int_distribution<size_t> random_index(0, num_size_ts - 1);
     constexpr size_t num_indices = 16 * 1024 * 1024;
     std::vector<size_t> indices(num_indices);
     for (size_t & index : indices)
@@ -242,8 +234,8 @@ void benchmark_memory_access_permutation_baseline(skb::State & state)
     state.SetItemsProcessed(state.iterations() * num_loops);
 }
 
-static constexpr int memory_access_min = 2048 / memory_benchmark_multiplier;
-static constexpr int memory_access_max = 4 * 1024 * 1024 * (1024 / memory_benchmark_multiplier);
+static constexpr int64_t memory_access_min = 2048;
+static constexpr int64_t memory_access_max = 4ll * 1024ll * 1024ll * 1024ll;
 SKA_BENCHMARK("baseline", benchmark_memory_access_baseline);
 SKA_BENCHMARK("baseline", benchmark_predictable_memory_access_baseline);
 SKA_BENCHMARK("baseline", benchmark_sequential_memory_access_baseline);

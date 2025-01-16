@@ -43,7 +43,7 @@ static interned_string DebugOrRelease() {
     return debug_or_release;
 }
 
-State::State(int num_iterations, int argument)
+State::State(int num_iterations, int64_t argument)
     : num_iterations(std::max(1, num_iterations))
     , argument(argument)
 {
@@ -350,7 +350,7 @@ Benchmark::~Benchmark()
 {
 }
 
-int BenchmarkResults::FindGoodNumberOfIterations(int argument, float desired_running_time) const
+int BenchmarkResults::FindGoodNumberOfIterations(int64_t argument, float desired_running_time) const
 {
     auto found = results.find(argument);
     if (found == results.end() || found->second.empty())
@@ -374,7 +374,7 @@ int BenchmarkResults::FindGoodNumberOfIterations(int argument, float desired_run
     return static_cast<int>(num_iterations);
 }
 
-std::vector<int> Benchmark::GetAllArguments() const
+std::vector<int64_t> Benchmark::GetAllArguments() const
 {
     std::lock_guard<std::mutex> lock(arguments_mutex);
     if (all_arguments.empty())
@@ -389,7 +389,7 @@ std::vector<int> Benchmark::GetAllArguments() const
         all_arguments.push_back(range_begin);
         for (double i = range_begin * multiplier; i < range_end;)
         {
-            int rounded = static_cast<int>(i + 0.5f);
+            int64_t rounded = static_cast<int64_t>(i + 0.5f);
             if (rounded <= all_arguments.back())
                 all_arguments.push_back(all_arguments.back() + 1);
             else
@@ -430,10 +430,10 @@ Benchmark::RangeOfArguments Benchmark::RangeOfArguments::Deserialize(std::string
 {
     auto end = str.data() + str.size();
     auto first_comma = std::find(str.data(), end, ',');
-    int range_begin;
+    int64_t range_begin;
     RAW_VERIFY(StrToNumber({str.data(), first_comma}, range_begin));
     auto second_comma = std::find(first_comma + 1, end, ',');
-    int range_end;
+    int64_t range_end;
     RAW_VERIFY(StrToNumber({first_comma + 1, second_comma}, range_end));
     double range_multiplier;
     RAW_VERIFY(StrToNumber({second_comma + 1, end}, range_multiplier));
@@ -485,7 +485,7 @@ void BenchmarkResults::ClearResults()
     results_added_signal.emit(this);
 }
 
-BenchmarkResults::RunAndBaselineResults BenchmarkResults::Run(int argument, RunType run_type)
+BenchmarkResults::RunAndBaselineResults BenchmarkResults::Run(int64_t argument, RunType run_type)
 {
     bool run_baseline_first = baseline_results && [&]
     {
@@ -597,7 +597,7 @@ ChildProcessOutput RunProcess(const std::vector<std::string> & arguments, bool f
     return { child_return_code, result };
 }
 
-RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int argument) const
+RunResults BenchmarkResults::RunInNewProcess(int num_iterations, int64_t argument) const
 {
     std::vector<std::string> arguments;
     if (this->executable.view().empty())
@@ -670,7 +670,7 @@ BenchmarkInOtherProcess::BenchmarkInOtherProcess(BenchmarkCategories type, Bench
     SetRange(range.begin, range.end);
     SetRangeMultiplier(range.multiplier);
     // fill keys in map
-    for (int i : GetAllArguments()) {
+    for (int64_t i : GetAllArguments()) {
         results->results[i];
     }
 }
@@ -798,7 +798,7 @@ bool RunSingleBenchmarkFromCommandLine(int argc, char * argv[])
         std::cout << "Error: the benchmark had a different name than expected. Expected: " << argv[3] << ", actual: " << results->categories->GetName() << std::endl;
         return true;
     }
-    int argument = 0;
+    int64_t argument = 0;
     if (!StrToNumber(argv[4], argument))
     {
         std::cout << "Error parsing the benchmark argument" << std::endl;

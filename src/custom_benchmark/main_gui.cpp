@@ -3,6 +3,7 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QDoubleValidator>
 #include <QDebug>
 #include "custom_benchmark/profile_mode.hpp"
 
@@ -124,11 +125,24 @@ BenchmarkMainGui::BenchmarkMainGui()
         }
     });
 
-    xlimit.setValidator(new QIntValidator());
+    xlimit.setValidator(new QDoubleValidator());
     xlimit.setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     QObject::connect(&xlimit, &QLineEdit::textChanged, this, [&](const QString & text)
     {
-        graph.SetXLimit(text.toInt());
+        if (is_formatting_xlimit) {
+            return;
+        }
+        QByteArray utf8 = text.toUtf8();
+        std::string unformatted(utf8.data(), utf8.length());
+        unformatted.erase(std::remove(unformatted.begin(), unformatted.end(), ','), unformatted.end());
+        int64_t new_xlimit = std::stoll(unformatted);
+        graph.SetXLimit(new_xlimit);
+        QString new_text = readable_xvalue(new_xlimit);
+        int cursor = xlimit.cursorPosition() + new_text.length() - text.length();
+        is_formatting_xlimit = true;
+        xlimit.setText(new_text);
+        xlimit.setCursorPosition(cursor);
+        is_formatting_xlimit = false;
     });
     xlimit.setText("1000000");
 

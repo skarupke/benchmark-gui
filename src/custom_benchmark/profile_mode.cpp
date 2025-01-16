@@ -8,7 +8,7 @@ namespace skb
 {
 struct ProfileModeArgs {
     int benchmark_index = -1;
-    int argument = -1;
+    int64_t argument = -1;
 };
 
 shared_memory_object & InitProfileMode(boost::interprocess::mode_t mode) {
@@ -19,7 +19,7 @@ shared_memory_object & InitProfileMode(boost::interprocess::mode_t mode) {
     return shm;
 }
 
-void EnableProfileMode(int benchmark_index, int argument) {
+void EnableProfileMode(int benchmark_index, int64_t argument) {
     shared_memory_object & shm = InitProfileMode(read_write);
     mapped_region region(shm, read_write);
     ProfileModeArgs* running = static_cast<ProfileModeArgs*>(region.get_address());
@@ -29,7 +29,7 @@ void DisableProfileMode() {
     EnableProfileMode(-1, -1);
 }
 
-bool IsProfileMode(int benchmark_index, int argument) {
+bool IsProfileMode(int benchmark_index, int64_t argument) {
     shared_memory_object & shm = InitProfileMode(read_only);
     mapped_region region(shm, read_only);
     ProfileModeArgs args = *static_cast<const ProfileModeArgs*>(region.get_address());

@@ -36,7 +36,7 @@ BenchmarkGraph::BenchmarkGraph(QWidget * parent)
     });
 }
 
-void BenchmarkGraph::EmitBenchmark(skb::BenchmarkResults * benchmark, int argument)
+void BenchmarkGraph::EmitBenchmark(skb::BenchmarkResults * benchmark, int64_t argument)
 {
     if (benchmark)
     {
@@ -184,11 +184,11 @@ struct GraphLabelPos
     }
 };
 
-GraphLabelPos GetXStep(int xmin, int xmax, int width)
+GraphLabelPos GetXStep(int64_t xmin, int64_t xmax, int width)
 {
-    int range = xmax - xmin;
+    int64_t range = xmax - xmin;
     int num_labels = std::max(2, width / 100);
-    int64_t two_power = 1;
+    int two_power = 1;
     while (int64_t(2) << (two_power * num_labels) < range)
         ++two_power;
     double power_of_two_multiplier = 1 << two_power;
@@ -239,7 +239,8 @@ QString readable_yvalue(double yvalue)
 }
 QString readable_xvalue(double xvalue)
 {
-    CHECK_FOR_PROGRAMMER_ERROR(xvalue >= 1.0);
+    if (xvalue < 1.0)
+        return QString("0");
     char buffer[128];
     char * to_write = buffer + 128;
     *--to_write = '\0';
@@ -264,6 +265,10 @@ GraphLabelPos GetYStep(double ymin, double ymax, int height)
     double rounded_max = rounded_min + rounded_add;
     rounded_max += rounded_add * static_cast<int>((ymax - rounded_max) / rounded_add);
     return { rounded_min, rounded_max, rounded_add, 1.0 };
+}
+
+bool is_finite(double x) {
+    return !std::isnan(x) && std::abs(x) != std::numeric_limits<double>::infinity();
 }
 
 void BenchmarkGraph::paintEvent(QPaintEvent *)
@@ -420,7 +425,7 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
                     jitter = std::pow(jitter, jitter_amount * jitter_fraction);
                     for (const skb::RunResults & result : it->second)
                     {
-                        int xvalue = result.argument;
+                        double xvalue = result.argument;
                         double yvalue = yval_from_result(result, baseline);
                         QPointF point(position_x(xvalue * jitter), position_y(yvalue));
                         benchmark_points.push_back(point);
@@ -447,9 +452,12 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
                         continue;
                     auto median = range.second.begin();
 
-                    int xvalue = median->argument;
+                    int64_t xvalue = median->argument;
                     double yvalue = yval_from_result(*median, baseline);
-                    QPointF point(position_x(xvalue), position_y(yvalue));
+                    double xpos = position_x(xvalue);
+                    double ypos = position_y(yvalue);
+                    CHECK_FOR_PROGRAMMER_ERROR(is_finite(xpos) && is_finite(ypos));
+                    QPointF point(xpos, ypos);
                     if (first)
                     {
                         first = false;
@@ -508,7 +516,7 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
         bool has_previous = false;
         double last_mean = 0.0;
         double last_stddev = 0.0;
-        int last_key = 0;
+        int64_t last_key = 0;
         skb::BenchmarkResults * baseline = highlighted_benchmark->baseline_results;
         for (const auto & one_point_result : highlighted_benchmark->results)
         {
@@ -541,8 +549,8 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
                 color.setAlpha(color.alpha() / 8);
                 my_painter.setPen(Qt::NoPen);
                 QPainterPath path;
-                CHECK_FOR_PROGRAMMER_ERROR(!std::isnan(last_x) && !std::isnan(last_min) && !std::isnan(last_max)
-                                           && !std::isnan(x) && !std::isnan(min) && !std::isnan(max));
+                CHECK_FOR_PROGRAMMER_ERROR(is_finite(last_x) && is_finite(last_min) && is_finite(last_max)
+                                           && is_finite(x) && is_finite(min) && is_finite(max));
                 path.moveTo(last_x, last_min);
                 path.lineTo(last_x, last_max);
                 path.lineTo(x, max);

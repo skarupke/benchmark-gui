@@ -5,6 +5,8 @@
 #include "signals/connection.hpp"
 #include "QtGui/QImage"
 
+QString readable_xvalue(double xvalue);
+
 class BenchmarkGraph : public QWidget
 {
     GUI_CS_OBJECT(BenchmarkGraph)
@@ -28,23 +30,23 @@ public:
         return data;
     }
 
-    void SetXLimit(int limit)
+    void SetXLimit(int64_t limit)
     {
         xlimit = limit;
         lines_dirty = true;
         update();
     }
-    int GetXLimit() const
+    int64_t GetXLimit() const
     {
         return xlimit;
     }
 
-    GUI_CS_SIGNAL_1(Public, void RunBenchmarkFirst(skb::BenchmarkResults * benchmark, int argument))
+    GUI_CS_SIGNAL_1(Public, void RunBenchmarkFirst(skb::BenchmarkResults * benchmark, int64_t argument))
     GUI_CS_SIGNAL_2(RunBenchmarkFirst, benchmark, argument)
 
 private:
 
-    int xlimit = 0;
+    int64_t xlimit = 0;
 
     std::vector<skb::BenchmarkResults *> data;
     std::vector<sig2::Connection<skb::BenchmarkResults *>> callbacks;
@@ -55,28 +57,28 @@ private:
     struct DrawnPoint
     {
         skb::BenchmarkResults * benchmark;
-        int argument;
+        int64_t argument;
         double x;
         double y;
         int color;
     };
     std::vector<DrawnPoint> points;
-    int xmin = 0;
-    int xmax = 0;
+    int64_t xmin = 0;
+    int64_t xmax = 0;
     double ymin = 0.0;
     double ymax = 0.0;
 
     skb::BenchmarkResults * highlighted_benchmark = nullptr;
-    int highlighted_argument = 0;
+    int64_t highlighted_argument = 0;
     skb::BenchmarkResults * mouse_press_highlighted = nullptr;
-    int mouse_press_highlighted_argument = 0;
+    int64_t mouse_press_highlighted_argument = 0;
     skb::BenchmarkResults * last_emitted = nullptr;
 
     void mousePressEvent(QMouseEvent *) override;
     void mouseReleaseEvent(QMouseEvent *) override;
     void mouseMoveEvent(QMouseEvent *event) override;
 
-    void EmitBenchmark(skb::BenchmarkResults * benchmark, int argument);
+    void EmitBenchmark(skb::BenchmarkResults * benchmark, int64_t argument);
 
     enum ClipboardStringType
     {

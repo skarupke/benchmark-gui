@@ -49,6 +49,7 @@ private:
     QCheckBox profile_mode;
     QLabel xlimit_label;
     QLineEdit xlimit;
+    bool is_formatting_xlimit = false;
 
     BenchmarkGraph graph;
 
