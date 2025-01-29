@@ -284,6 +284,7 @@ int main(int argc, char * argv[])
         return result;
 
     keep_running = false;
+    skb::DisableProfileMode();
     benchmark_thread.join();
 
     persist_to_db(permanent_storage);
