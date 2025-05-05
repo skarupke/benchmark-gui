@@ -327,11 +327,10 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
 
     if (lines_dirty || lines.size() != overall_size)
     {
-        lines_dirty = false;
         if (lines.size() != overall_size)
             lines = QImage(overall_size, QImage::Format_ARGB32);
-        xmin = std::numeric_limits<int>::max();
-        xmax = std::numeric_limits<int>::lowest();
+        xmin = std::numeric_limits<int64_t>::max();
+        xmax = std::numeric_limits<int64_t>::lowest();
         ymin = 0.0;
         ymax = std::numeric_limits<double>::lowest();
 
@@ -359,6 +358,7 @@ void BenchmarkGraph::paintEvent(QPaintEvent *)
 
         if (xmin >= xmax || ymin >= ymax)
             return;
+        lines_dirty = false;
         log_xmin = std::log(xmin);
         log_xrange = std::log(xmax) - log_xmin;
 

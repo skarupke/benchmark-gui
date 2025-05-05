@@ -77,7 +77,7 @@ if debug_symbols then
     CPP_FLAGS += '-fdebug-prefix-map=src/=../src/'
     --CPP_FLAGS += '-fdebug-prefix-map=./libs/=../libs/'
     --CPP_FLAGS += '-fdebug-prefix-map=libs/=../libs/'
-    --CPP_FLAGS += '-fdebug-prefix-map=./main=../main'
+    CPP_FLAGS += '-fdebug-prefix-map=./main=../main'
 end
 CPP_FLAGS += '-fno-omit-frame-pointer'
 CPP_FLAGS += '-fPIE'
