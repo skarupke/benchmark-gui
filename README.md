@@ -4,7 +4,9 @@
 
 In Linux Mint:
 sudo apt install tup g++ clang libboost-dev libsqlite3-dev libaudio-dev
+tup init
 tup
+
 Then e.g.
 cd build-clang
 ./main
